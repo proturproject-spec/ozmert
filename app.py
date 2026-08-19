@@ -182,7 +182,102 @@ def raporlar():
 @app.route('/parametreler')
 def parametreler():
     connections = load_db_config()
-    return render_template('parametreler.html', aktif_sayfa='parametreler', connections=connections)
+    users_raw = load_users()
+    # Şifre hash'lerini frontend'e göndermemek için temiz liste oluştur
+    users = [
+        {
+            'username': u.get('username'),
+            'name': u.get('name', u.get('username')),
+            'role': u.get('role', 'user')
+        }
+        for u in users_raw
+    ]
+    return render_template('parametreler.html', aktif_sayfa='parametreler', connections=connections, users=users)
+
+@app.route('/api/users/add', methods=['POST'])
+def add_user_api():
+    if 'user' not in session or session['user'].get('role') != 'admin':
+        return jsonify({'success': False, 'message': 'Bu işlem için yönetici (admin) yetkisi gereklidir.'}), 403
+
+    data = request.get_json() or {}
+    username = data.get('username', '').strip().lower()
+    name = data.get('name', '').strip() or username
+    password = data.get('password', '')
+    role = data.get('role', 'user')
+
+    if not username or not password:
+        return jsonify({'success': False, 'message': 'Kullanıcı adı ve şifre zorunludur.'}), 400
+
+    if len(password) < 4:
+        return jsonify({'success': False, 'message': 'Şifre en az 4 karakter olmalıdır.'}), 400
+
+    users = load_users()
+    for u in users:
+        if u.get('username', '').lower() == username:
+            return jsonify({'success': False, 'message': f"'{username}' kullanıcı adı zaten kullanımda."}), 400
+
+    users.append({
+        'username': username,
+        'name': name,
+        'password_hash': generate_password_hash(password),
+        'role': role
+    })
+
+    if save_users(users):
+        return jsonify({'success': True, 'message': f"'{username}' kullanıcısı başarıyla eklendi."})
+    return jsonify({'success': False, 'message': 'Kullanıcı kaydedilemedi.'}), 500
+
+@app.route('/api/users/reset-password', methods=['POST'])
+def admin_reset_password_api():
+    if 'user' not in session or session['user'].get('role') != 'admin':
+        return jsonify({'success': False, 'message': 'Bu işlem için yönetici yetkisi gereklidir.'}), 403
+
+    data = request.get_json() or {}
+    target_username = data.get('username', '').strip()
+    new_password = data.get('new_password', '')
+
+    if not target_username or not new_password:
+        return jsonify({'success': False, 'message': 'Kullanıcı ve yeni şifre zorunludur.'}), 400
+
+    if len(new_password) < 4:
+        return jsonify({'success': False, 'message': 'Yeni şifre en az 4 karakter olmalıdır.'}), 400
+
+    users = load_users()
+    user_found = False
+    for u in users:
+        if u.get('username') == target_username:
+            u['password_hash'] = generate_password_hash(new_password)
+            user_found = True
+            break
+
+    if user_found and save_users(users):
+        return jsonify({'success': True, 'message': f"'{target_username}' kullanıcısının şifresi güncellendi."})
+    return jsonify({'success': False, 'message': 'Kullanıcı bulunamadı.'}), 404
+
+@app.route('/api/users/delete', methods=['POST'])
+def delete_user_api():
+    if 'user' not in session or session['user'].get('role') != 'admin':
+        return jsonify({'success': False, 'message': 'Bu işlem için yönetici yetkisi gereklidir.'}), 403
+
+    data = request.get_json() or {}
+    target_username = data.get('username', '').strip()
+
+    if not target_username:
+        return jsonify({'success': False, 'message': 'Kullanıcı adı belirtilmedi.'}), 400
+
+    if target_username == session['user']['username']:
+        return jsonify({'success': False, 'message': 'Kendinizi silemezsiniz.'}), 400
+
+    users = load_users()
+    initial_len = len(users)
+    users = [u for u in users if u.get('username') != target_username]
+
+    if len(users) == initial_len:
+        return jsonify({'success': False, 'message': 'Kullanıcı bulunamadı.'}), 404
+
+    if save_users(users):
+        return jsonify({'success': True, 'message': f"'{target_username}' kullanıcısı silindi."})
+    return jsonify({'success': False, 'message': 'Kullanıcı silinemedi.'}), 500
 
 @app.route('/api/change-password', methods=['POST'])
 def change_password():
