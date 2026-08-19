@@ -1,62 +1,16 @@
 import json
 import os
 import time
-import urllib.parse
 from functools import wraps
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import create_engine, text
+from db_manager import load_db_config, save_db_config, build_connection_uri, get_engine
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'finans_muhasebe_secret_key_2025_secure_xyz')
 
-CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'db_config.json')
 USERS_FILE = os.path.join(os.path.dirname(__file__), 'users.json')
-
-DEFAULT_CONNECTIONS = [
-    {
-        "id": 1,
-        "name": "1. SQL Bağlantısı (Ana Veritabanı)",
-        "driver": "ODBC Driver 17 for SQL Server",
-        "server": "UFUK-SERVER",
-        "port": "1433",
-        "database": "UFUK2025",
-        "username": "MDT_REPORT",
-        "password": "MDT_REPORT",
-        "trusted_connection": False,
-        "trust_server_certificate": True,
-        "timeout": 5,
-        "is_active": True
-    },
-    {
-        "id": 2,
-        "name": "2. SQL Bağlantısı (Nexlog Veritabanı)",
-        "driver": "ODBC Driver 17 for SQL Server",
-        "server": "UFUK-SERVER",
-        "port": "1433",
-        "database": "NEXLOG",
-        "username": "MDT_REPORT",
-        "password": "MDT_REPORT",
-        "trusted_connection": False,
-        "trust_server_certificate": True,
-        "timeout": 5,
-        "is_active": True
-    },
-    {
-        "id": 3,
-        "name": "3. SQL Bağlantısı (Rapor / Arşiv DB)",
-        "driver": "ODBC Driver 17 for SQL Server",
-        "server": "UFUK-SERVER",
-        "port": "1433",
-        "database": "RAPORDB",
-        "username": "sa",
-        "password": "",
-        "trusted_connection": False,
-        "trust_server_certificate": True,
-        "timeout": 5,
-        "is_active": False
-    }
-]
 
 def load_users():
     if not os.path.exists(USERS_FILE):
@@ -92,28 +46,6 @@ def authenticate_user(username, password):
             if check_password_hash(user.get('password_hash', ''), password):
                 return user
     return None
-
-def load_db_config():
-    if not os.path.exists(CONFIG_FILE):
-        save_db_config(DEFAULT_CONNECTIONS)
-        return DEFAULT_CONNECTIONS
-    try:
-        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            if isinstance(data, list) and len(data) >= 3:
-                return data
-            return DEFAULT_CONNECTIONS
-    except Exception:
-        return DEFAULT_CONNECTIONS
-
-def save_db_config(connections):
-    try:
-        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-            json.dump(connections, f, ensure_ascii=False, indent=2)
-        return True
-    except Exception as e:
-        print(f"Config kaydetme hatası: {e}")
-        return False
 
 @app.context_processor
 def inject_user():
@@ -347,29 +279,7 @@ def test_connection_api():
         if not database:
             return jsonify({'success': False, 'message': 'Veritabanı (Database) adı boş bırakılamaz.'}), 400
 
-        server_part = f"{server},{port}" if port and port != "1433" else server
-
-        params_parts = [
-            f"DRIVER={{{driver}}}",
-            f"SERVER={server_part}",
-            f"DATABASE={database}"
-        ]
-
-        if trusted_conn:
-            params_parts.append("Trusted_Connection=yes")
-        else:
-            if not username:
-                return jsonify({'success': False, 'message': 'Kullanıcı adı boş bırakılamaz.'}), 400
-            params_parts.append(f"UID={username}")
-            params_parts.append(f"PWD={password}")
-
-        if trust_cert:
-            params_parts.append("TrustServerCertificate=yes")
-
-        connection_str = ";".join(params_parts) + ";"
-        encoded_params = urllib.parse.quote_plus(connection_str)
-        conn_uri = f"mssql+pyodbc:///?odbc_connect={encoded_params}"
-
+        conn_uri = build_connection_uri(conn_data)
         start_time = time.time()
         engine = create_engine(conn_uri, connect_args={"timeout": timeout})
         

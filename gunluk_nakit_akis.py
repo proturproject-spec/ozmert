@@ -26,24 +26,19 @@ def format_currency(value):
     except (ValueError, TypeError):
         return str(value)
 
-# --- SQL BAĞLANTI AYARLARI ---
-params = urllib.parse.quote_plus(
-    'DRIVER={SQL Server};'
-    'SERVER=UFUK-SERVER;'
-    'DATABASE=UFUK2025;'
-    'UID=MDT_REPORT;'
-    'PWD=MDT_REPORT'
-)
-engine = create_engine(f"mssql+pyodbc:///?odbc_connect={params}")
+# --- SQL BAĞLANTI AYARLARI (db_config.json üzerinden dinamik yüklenir) ---
+from db_manager import get_engine
+try:
+    engine = get_engine(1) # 1. SQL Bağlantısı (Ana Veritabanı)
+except Exception as _e:
+    print(f"Ana Veritabanı (Engine 1) başlatma uyarısı: {_e}")
+    engine = None
 
-params_nexlog = urllib.parse.quote_plus(
-    'DRIVER={SQL Server};'
-    'SERVER=UFUK-SERVER;'
-    'DATABASE=NEXLOG;'
-    'UID=MDT_REPORT;'
-    'PWD=MDT_REPORT'
-)
-engine_nexlog = create_engine(f"mssql+pyodbc:///?odbc_connect={params_nexlog}")
+try:
+    engine_nexlog = get_engine(2) # 2. SQL Bağlantısı (Nexlog Veritabanı)
+except Exception as _e:
+    print(f"Nexlog Veritabanı (Engine 2) başlatma uyarısı: {_e}")
+    engine_nexlog = None
 
 _NEXLOG_CATEGORIES_CACHE = None
 
