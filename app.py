@@ -1,6 +1,7 @@
 import json
 import os
 import time
+import requests as http_requests
 from datetime import timedelta
 import io
 import pandas as pd
@@ -9,6 +10,12 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for, s
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import create_engine, text
 from db_manager import load_db_config, save_db_config, build_connection_uri, get_engine
+
+# Render ortamında: BRIDGE_URL env değişkeni ile yerel SQL köprüsüne bağlan
+# Örnek: BRIDGE_URL=https://xxxx.ngrok-free.app
+BRIDGE_URL = os.environ.get('BRIDGE_URL', '').rstrip('/')
+BRIDGE_KEY = os.environ.get('BRIDGE_API_KEY', 'nexlog_bridge_2026_secure_xKj9')
+USE_BRIDGE = bool(BRIDGE_URL)  # Eğer BRIDGE_URL varsa SQL bridge'i kullan
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'finans_muhasebe_secret_key_2025_secure_xyz')
@@ -204,15 +211,36 @@ def get_cari_queries(year):
 def get_cari_ekstre_df(year, date_val, cari_code):
     if not cari_code:
         return pd.DataFrame()
-    
-    engine = get_engine(1)
-    _, base_q, devir_q = get_cari_queries(year)
 
-    with engine.connect() as conn:
-        params = {"date": date_val, "cari_code": cari_code.strip()}
-        devir_res = conn.execute(text(devir_q), params).fetchone()
-        devir_tutari = float(devir_res[0] or 0) if devir_res and devir_res[0] is not None else 0.0
-        df = pd.read_sql(text(base_q), conn, params=params)
+    # Render ortamında SQL köprüsünden veri çek
+    if USE_BRIDGE:
+        try:
+            resp = http_requests.get(
+                f"{BRIDGE_URL}/bridge/cari-ekstre",
+                params={'year': year, 'date': date_val, 'cari': cari_code},
+                headers={'X-Bridge-Key': BRIDGE_KEY},
+                timeout=30
+            )
+            data = resp.json()
+            if 'error' in data:
+                return pd.DataFrame()
+            rows = data.get('rows', [])
+            devir_tutari = float(data.get('devir', 0))
+            df = pd.DataFrame(rows)
+            if not df.empty and 'TARIH' in df.columns:
+                df['TARIH'] = pd.to_datetime(df['TARIH'], errors='coerce')
+        except Exception as e:
+            print(f"Bridge hatası: {e}")
+            return pd.DataFrame()
+    else:
+        # Lokal SQL bağlantısı
+        engine = get_engine(1)
+        _, base_q, devir_q = get_cari_queries(year)
+        with engine.connect() as conn:
+            params = {"date": date_val, "cari_code": cari_code.strip()}
+            devir_res = conn.execute(text(devir_q), params).fetchone()
+            devir_tutari = float(devir_res[0] or 0) if devir_res and devir_res[0] is not None else 0.0
+            df = pd.read_sql(text(base_q), conn, params=params)
 
     devir_row = pd.DataFrame([{
         'TARIH': None,
@@ -231,6 +259,7 @@ def get_cari_ekstre_df(year, date_val, cari_code):
     df['BAKIYE'] = (df['BORC'] - df['ALACAK']).cumsum()
     return df
 
+
 @app.route('/finans/cari-ekstre')
 def cari_ekstre():
     return render_template('cari_ekstre.html', aktif_sayfa='cari_ekstre')
@@ -243,14 +272,25 @@ def cari_kapama():
 def api_cariler():
     year = request.args.get('year', '2026')
     try:
-        engine = get_engine(1)
-        cards_q, _, _ = get_cari_queries(year)
-        with engine.connect() as conn:
-            cariler = pd.read_sql(text(cards_q), conn).to_dict(orient='records')
-        return jsonify(cariler)
+        # Render ortamında köprüden çek
+        if USE_BRIDGE:
+            resp = http_requests.get(
+                f"{BRIDGE_URL}/bridge/cariler",
+                params={'year': year},
+                headers={'X-Bridge-Key': BRIDGE_KEY},
+                timeout=15
+            )
+            return jsonify(resp.json())
+        else:
+            engine = get_engine(1)
+            cards_q, _, _ = get_cari_queries(year)
+            with engine.connect() as conn:
+                cariler = pd.read_sql(text(cards_q), conn).to_dict(orient='records')
+            return jsonify(cariler)
     except Exception as e:
         print(f"Cari kartlar getirme hatası: {e}")
         return jsonify([])
+
 
 @app.route('/finans/api/cari-ekstre-data')
 def api_cari_ekstre_data():
