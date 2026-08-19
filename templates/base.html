@@ -4,6 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Yönetim Paneli{% endblock %}</title>
+    <script>
+        // Sekme / Sayfa Kapanma Doğrulaması (Tab Session Handshake)
+        (function() {
+            const serverToken = "{{ session_tab_token }}";
+            const isFresh = {{ 'true' if is_fresh_login else 'false' }};
+            if (serverToken) {
+                if (isFresh) {
+                    sessionStorage.setItem('active_tab_token', serverToken);
+                } else {
+                    const storedToken = sessionStorage.getItem('active_tab_token');
+                    if (!storedToken || storedToken !== serverToken) {
+                        // Sekme veya sayfa 'X' ile kapatılmış, yeni sekmede/pencerede açılmış
+                        sessionStorage.removeItem('active_tab_token');
+                        window.location.replace('/logout?timeout=1');
+                    }
+                }
+            }
+        })();
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {

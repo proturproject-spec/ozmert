@@ -54,10 +54,15 @@ def authenticate_user(username, password):
                 return user
     return None
 
+import secrets
+
 @app.context_processor
 def inject_user():
+    is_fresh = session.pop('login_fresh', False)
     return {
-        'current_user': session.get('user')
+        'current_user': session.get('user'),
+        'session_tab_token': session.get('tab_token', ''),
+        'is_fresh_login': is_fresh
     }
 
 @app.before_request
@@ -87,7 +92,7 @@ def login():
     
     error = None
     if request.args.get('timeout'):
-        error = 'Güvenlik gereği oturumunuz 5 dakika işlem yapılmadığı için sonlandırıldı. Lütfen tekrar şifre girin.'
+        error = 'Güvenlik gereği oturumunuz 5 dakika işlem yapılmadığı veya sekme kapatıldığı için sonlandırıldı. Lütfen tekrar şifre girin.'
 
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
@@ -102,6 +107,8 @@ def login():
                 'name': user.get('name', username),
                 'role': user.get('role', 'user')
             }
+            session['tab_token'] = secrets.token_hex(16)
+            session['login_fresh'] = True
             session['last_active'] = time.time()
             next_url = request.args.get('next') or url_for('index')
             return redirect(next_url)
