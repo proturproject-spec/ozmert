@@ -62,9 +62,9 @@ def load_users():
     if not os.path.exists(USERS_FILE):
         default_users = [
             {
-                "username": "admin",
-                "password_hash": generate_password_hash("admin123"),
-                "name": "Yönetici (Admin)",
+                "username": "yokus",
+                "password_hash": generate_password_hash("hasret7903"),
+                "name": "Ali Yokuş (Yönetici)",
                 "role": "admin"
             }
         ]
