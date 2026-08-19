@@ -9,10 +9,17 @@
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
 <style>
+    /* Ana sarmalayıcıyı tam genişliğe aç */
+    main {
+        max-width: 100% !important;
+        padding: 1.5rem 1.25rem !important;
+    }
+
     .ekstre-container {
         display: flex;
         flex-direction: column;
         gap: 1.25rem;
+        width: 100%;
     }
 
     .filter-card {
@@ -150,15 +157,40 @@
     .table-responsive {
         width: 100%;
         overflow-x: auto;
-        max-height: 65vh;
+        max-height: calc(100vh - 340px);
+        overflow-y: auto;
     }
 
     .ekstre-table {
         width: 100%;
         border-collapse: collapse;
-        font-size: 0.825rem;
+        font-size: 0.8rem;
         text-align: left;
-        min-width: 1200px;
+        table-layout: fixed;
+    }
+
+    /* Sütun Genişlikleri - tabloya tam sığacak şekilde */
+    .ekstre-table thead th:nth-child(1) { width: 80px; }   /* Tarih */
+    .ekstre-table thead th:nth-child(2) { width: 70px; }   /* Özel Kod */
+    .ekstre-table thead th:nth-child(3) { width: 18%; }    /* Cari Ünvan */
+    .ekstre-table thead th:nth-child(4) { width: 120px; }  /* İşlem Türü */
+    .ekstre-table thead th:nth-child(5) { width: 90px; }   /* Fiş No */
+    .ekstre-table thead th:nth-child(6) { width: auto; }   /* Açıklama - kalan yer */
+    .ekstre-table thead th:nth-child(7) { width: 100px; }  /* Borç */
+    .ekstre-table thead th:nth-child(8) { width: 100px; }  /* Alacak */
+    .ekstre-table thead th:nth-child(9) { width: 100px; }  /* Bakiye */
+
+    .ekstre-table tbody td {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* Açıklama ve Cari sütunlarında kelime kaydırma */
+    .ekstre-table tbody td:nth-child(3),
+    .ekstre-table tbody td:nth-child(6) {
+        white-space: normal;
+        word-break: break-word;
     }
 
     .ekstre-table thead th {
@@ -174,9 +206,12 @@
     }
 
     .ekstre-table tbody td {
-        padding: 0.65rem 0.85rem;
+        padding: 0.6rem 0.75rem;
         border-bottom: 1px solid rgba(255, 255, 255, 0.04);
         vertical-align: middle;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .ekstre-table tbody tr:nth-child(even) {
