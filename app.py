@@ -2,8 +2,10 @@ import json
 import os
 import time
 from datetime import timedelta
+import io
+import pandas as pd
 from functools import wraps
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash, Response
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import create_engine, text
 from db_manager import load_db_config, save_db_config, build_connection_uri, get_engine
@@ -136,6 +138,203 @@ def muhasebe():
 @app.route('/finans')
 def finans():
     return render_template('finans.html', aktif_sayfa='finans')
+
+# --- CARİ HESAP EKSTRESİ & KAPAMA MODÜLÜ ---
+DB_YEAR_PREFIX_MAP = {
+    "2025": "225",
+    "2026": "226"
+}
+
+def format_currency(x):
+    if pd.isna(x) or x is None:
+        return "0,00"
+    return "{:,.2f}".format(float(x)).replace(",", "X").replace(".", ",").replace("X", ".")
+
+def get_cari_queries(year):
+    p = DB_YEAR_PREFIX_MAP.get(str(year), "226")
+    cards_query = f"SELECT CODE, DEFINITION_ FROM LG_{p}_CLCARD WHERE CODE LIKE '120.%' ORDER BY DEFINITION_"
+    
+    base_query = f"""
+    SELECT
+        CLF.DATE_ AS [TARIH],
+        REPLACE(LTRIM(RTRIM(C.SPECODE2)), '  ', ' ') AS [OZEL_KOD],
+        C.CODE + ' / ' + C.DEFINITION_ AS [CARI_UNVAN],
+        CASE WHEN CLF.TRCODE = 1 THEN 'Nakit tahsilat'
+             WHEN CLF.TRCODE = 2 THEN 'Nakit ödeme'
+             WHEN CLF.TRCODE = 3 THEN 'Borç dekontu'
+             WHEN CLF.TRCODE = 4 THEN 'Alacak dekontu'
+             WHEN CLF.TRCODE = 5 THEN 'Virman İşlemi'
+             WHEN CLF.TRCODE = 6 THEN 'Kur farkı işlemi'
+             WHEN CLF.TRCODE = 12 THEN 'Özel işlem'
+             WHEN CLF.TRCODE = 14 THEN 'Açılış'
+             WHEN CLF.TRCODE = 20 THEN 'Gelen havaleler'
+             WHEN CLF.TRCODE = 21 THEN 'Gönderilen havaleler'
+             WHEN CLF.TRCODE = 31 THEN 'Mal alım fat.'
+             WHEN CLF.TRCODE = 36 THEN 'Alım iade fat.'
+             WHEN CLF.TRCODE = 37 THEN 'Perakende satış fat.'
+             WHEN CLF.TRCODE = 38 THEN 'Toptan satış fat.'
+             WHEN CLF.TRCODE = 39 THEN 'Verilen hizmet faturası'
+             WHEN CLF.TRCODE IN (61,62) THEN 'Çek/Senet Girişi'
+             WHEN CLF.TRCODE IN (63,64) THEN 'Çek/Senet Çıkışı'
+             ELSE 'Diğer' END AS [ISLEM_TURU],
+        CLF.TRANNO AS [FIS_NO],
+        CAST(CLF.LINEEXP AS VARCHAR(MAX)) AS [ACIKLAMA],
+        CASE WHEN CLF.SIGN = 0 THEN CLF.TRNET ELSE 0 END AS [BORC],
+        CASE WHEN CLF.SIGN = 1 THEN CLF.TRNET ELSE 0 END AS [ALACAK]
+    FROM LG_{p}_01_CLFLINE CLF
+    LEFT JOIN LG_{p}_CLCARD C ON C.LOGICALREF = CLF.CLIENTREF
+    WHERE CLF.CANCELLED = 0 
+    AND LTRIM(RTRIM(C.CODE)) = LTRIM(RTRIM(:cari_code)) 
+    AND CAST(CLF.DATE_ AS DATE) >= :date
+    ORDER BY CLF.DATE_, CLF.FTIME, CLF.LOGICALREF
+    """
+
+    devir_query = f"""
+    SELECT 
+        SUM(CASE WHEN CLF.SIGN = 0 THEN CLF.TRNET ELSE 0 END) - 
+        SUM(CASE WHEN CLF.SIGN = 1 THEN CLF.TRNET ELSE 0 END) as DEVIR
+    FROM LG_{p}_01_CLFLINE CLF
+    LEFT JOIN LG_{p}_CLCARD C ON C.LOGICALREF = CLF.CLIENTREF
+    WHERE CLF.CANCELLED = 0 
+    AND LTRIM(RTRIM(C.CODE)) = LTRIM(RTRIM(:cari_code)) 
+    AND CAST(CLF.DATE_ AS DATE) < :date
+    """
+    return cards_query, base_query, devir_query
+
+def get_cari_ekstre_df(year, date_val, cari_code):
+    if not cari_code:
+        return pd.DataFrame()
+    
+    engine = get_engine(1)
+    _, base_q, devir_q = get_cari_queries(year)
+
+    with engine.connect() as conn:
+        params = {"date": date_val, "cari_code": cari_code.strip()}
+        devir_res = conn.execute(text(devir_q), params).fetchone()
+        devir_tutari = float(devir_res[0] or 0) if devir_res and devir_res[0] is not None else 0.0
+        df = pd.read_sql(text(base_q), conn, params=params)
+
+    devir_row = pd.DataFrame([{
+        'TARIH': None,
+        'OZEL_KOD': '',
+        'CARI_UNVAN': 'Önceki Dönemden Devir',
+        'ISLEM_TURU': 'Açılış/Devir',
+        'FIS_NO': '---',
+        'ACIKLAMA': 'Önceki Dönem Bakiye Devri',
+        'BORC': devir_tutari if devir_tutari > 0 else 0.0,
+        'ALACAK': abs(devir_tutari) if devir_tutari < 0 else 0.0
+    }])
+
+    df = pd.concat([devir_row, df], ignore_index=True)
+    df['BORC'] = pd.to_numeric(df['BORC'], errors='coerce').fillna(0.0)
+    df['ALACAK'] = pd.to_numeric(df['ALACAK'], errors='coerce').fillna(0.0)
+    df['BAKIYE'] = (df['BORC'] - df['ALACAK']).cumsum()
+    return df
+
+@app.route('/finans/cari-ekstre')
+def cari_ekstre():
+    return render_template('cari_ekstre.html', aktif_sayfa='cari_ekstre')
+
+@app.route('/finans/cari-kapama')
+def cari_kapama():
+    return render_template('cari_kapama.html', aktif_sayfa='cari_kapama')
+
+@app.route('/finans/api/cariler')
+def api_cariler():
+    year = request.args.get('year', '2026')
+    try:
+        engine = get_engine(1)
+        cards_q, _, _ = get_cari_queries(year)
+        with engine.connect() as conn:
+            cariler = pd.read_sql(text(cards_q), conn).to_dict(orient='records')
+        return jsonify(cariler)
+    except Exception as e:
+        print(f"Cari kartlar getirme hatası: {e}")
+        return jsonify([])
+
+@app.route('/finans/api/cari-ekstre-data')
+def api_cari_ekstre_data():
+    year = request.args.get('year', '2026')
+    date_val = request.args.get('date', f'{year}-01-01')
+    cari = request.args.get('cari', '').strip()
+
+    if not cari:
+        return jsonify({'error': 'Cari hesap seçilmedi.'}), 400
+
+    try:
+        df = get_cari_ekstre_df(year, date_val, cari)
+        if df.empty:
+            return jsonify({
+                'html': '<div style="padding: 4rem 2rem; text-align: center; color: var(--text-muted);">Bu cari karta ait hareket bulunamadı.</div>',
+                't_borc': '0,00',
+                't_alacak': '0,00',
+                't_bakiye': '0,00'
+            })
+
+        t_borc = float(df['BORC'].sum())
+        t_alacak = float(df['ALACAK'].sum())
+        t_bakiye = t_borc - t_alacak
+
+        html = '<table class="ekstre-table"><thead><tr>'
+        html += '<th>Tarih</th><th>Özel Kod</th><th>Cari Ünvan</th>'
+        html += '<th>İşlem Türü</th><th>Fiş No</th><th>Açıklama</th>'
+        html += '<th class="text-right">Borç</th><th class="text-right">Alacak</th><th class="text-right">Bakiye</th></tr></thead><tbody>'
+
+        for _, row in df.iterrows():
+            is_devir = row['CARI_UNVAN'] == 'Önceki Dönemden Devir'
+            tarih_str = row['TARIH'].strftime('%d.%m.%Y') if row['TARIH'] is not None and not pd.isna(row['TARIH']) else 'DEVİR'
+            row_class = ' class="devir-row"' if is_devir else ''
+            
+            bakiye_val = float(row['BAKIYE'])
+            bakiye_color = '#60a5fa' if bakiye_val == 0 else ('#f87171' if bakiye_val > 0 else '#34d399')
+
+            html += f'<tr{row_class}>'
+            html += f'<td><strong style="color: #93c5fd;">{tarih_str}</strong></td>'
+            html += f'<td>{row["OZEL_KOD"] or "-"}</td>'
+            html += f'<td><span style="font-weight: 500;">{row["CARI_UNVAN"]}</span></td>'
+            html += f'<td><span class="badge-islem">{row["ISLEM_TURU"]}</span></td>'
+            html += f'<td><code style="color: #cbd5e1;">{row["FIS_NO"] or "-"}</code></td>'
+            html += f'<td style="max-width: 350px; word-break: break-word; color: var(--text-muted);">{row["ACIKLAMA"] or "-"}</td>'
+            html += f'<td class="text-right" style="color: #fca5a5;">{format_currency(row["BORC"])}</td>'
+            html += f'<td class="text-right" style="color: #86efac;">{format_currency(row["ALACAK"])}</td>'
+            html += f'<td class="text-right" style="font-weight: 700; color: {bakiye_color};">{format_currency(bakiye_val)}</td>'
+            html += '</tr>'
+
+        html += '</tbody></table>'
+
+        return jsonify({
+            'html': html,
+            't_borc': format_currency(t_borc),
+            't_alacak': format_currency(t_alacak),
+            't_bakiye': format_currency(t_bakiye)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/finans/cari-ekstre/export')
+def export_cari_ekstre():
+    year = request.args.get('year', '2026')
+    date_val = request.args.get('date', f'{year}-01-01')
+    cari = request.args.get('cari', '').strip()
+
+    if not cari:
+        return redirect(url_for('cari_ekstre'))
+
+    try:
+        df = get_cari_ekstre_df(year, date_val, cari)
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df.to_excel(writer, index=False, sheet_name='Cari_Ekstre')
+        output.seek(0)
+
+        filename = f"Cari_Ekstre_{cari.replace('/', '_').replace(' ', '_')}_{year}.xlsx"
+        return Response(
+            output.read(),
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    except Exception as e:
+        return f"Excel dışa aktarma hatası: {str(e)}", 500
 
 @app.route('/raporlar')
 def raporlar():

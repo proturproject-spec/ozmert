@@ -1,0 +1,401 @@
+{% extends "base.html" %}
+
+{% block title %}Cari Hesap Ekstresi - Finans Yönetimi{% endblock %}
+
+{% block content %}
+<!-- Select2 CSS & JS -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<style>
+    .ekstre-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+    }
+
+    .filter-card {
+        background: linear-gradient(145deg, #1e293b, #172033);
+        border: 1px solid var(--border-color);
+        border-radius: 0.75rem;
+        padding: 1.25rem 1.5rem;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+    }
+
+    .filter-row {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .filter-item {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+    }
+
+    .filter-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .select-custom, .input-date {
+        background: #0f172a;
+        border: 1px solid var(--border-color);
+        color: #f8fafc;
+        padding: 0.55rem 0.85rem;
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+        height: 40px;
+        box-sizing: border-box;
+        outline: none;
+    }
+
+    .select-custom:focus, .input-date:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+    }
+
+    /* Select2 Dark Mode Özelleştirmeleri */
+    .select2-container--default .select2-selection--single {
+        background-color: #0f172a !important;
+        border: 1px solid var(--border-color) !important;
+        height: 40px !important;
+        border-radius: 0.5rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        color: #f8fafc !important;
+        padding-left: 0.85rem !important;
+        font-size: 0.875rem !important;
+    }
+
+    .select2-dropdown {
+        background-color: #1e293b !important;
+        border: 1px solid var(--border-color) !important;
+        color: #f8fafc !important;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.5) !important;
+    }
+
+    .select2-search__field {
+        background-color: #0f172a !important;
+        color: #f8fafc !important;
+        border: 1px solid var(--border-color) !important;
+        border-radius: 0.35rem !important;
+        padding: 0.4rem 0.6rem !important;
+    }
+
+    .select2-container--default .select2-results__option--highlighted[aria-selected] {
+        background-color: #3b82f6 !important;
+        color: #fff !important;
+    }
+
+    .select2-container--default .select2-results__option[aria-selected=true] {
+        background-color: rgba(59, 130, 246, 0.2) !important;
+    }
+
+    /* KPI Özet Kartları */
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .kpi-card {
+        background: #0f172a;
+        border: 1px solid var(--border-color);
+        border-radius: 0.6rem;
+        padding: 0.85rem 1.1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .kpi-title {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+    }
+
+    .kpi-value {
+        font-size: 1.35rem;
+        font-weight: 700;
+        font-family: 'Roboto Mono', monospace, sans-serif;
+    }
+
+    .kpi-value.borc { color: #f87171; }
+    .kpi-value.alacak { color: #34d399; }
+    .kpi-value.bakiye { color: #60a5fa; }
+
+    /* Tablo Alanı */
+    .table-card {
+        background: #1e293b;
+        border: 1px solid var(--border-color);
+        border-radius: 0.75rem;
+        overflow: hidden;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+    }
+
+    .table-responsive {
+        width: 100%;
+        overflow-x: auto;
+        max-height: 65vh;
+    }
+
+    .ekstre-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.825rem;
+        text-align: left;
+        min-width: 1200px;
+    }
+
+    .ekstre-table thead th {
+        position: sticky;
+        top: 0;
+        background: #0f172a;
+        color: #94a3b8;
+        padding: 0.75rem 0.85rem;
+        font-weight: 600;
+        border-bottom: 2px solid var(--border-color);
+        z-index: 10;
+        white-space: nowrap;
+    }
+
+    .ekstre-table tbody td {
+        padding: 0.65rem 0.85rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        vertical-align: middle;
+    }
+
+    .ekstre-table tbody tr:nth-child(even) {
+        background-color: rgba(255, 255, 255, 0.015);
+    }
+
+    .ekstre-table tbody tr:hover {
+        background-color: rgba(59, 130, 246, 0.08);
+    }
+
+    .ekstre-table .devir-row {
+        background-color: rgba(234, 179, 8, 0.12) !important;
+        font-weight: 700;
+        border-bottom: 2px solid rgba(234, 179, 8, 0.3) !important;
+    }
+
+    .text-right {
+        text-align: right !important;
+        font-family: 'Roboto Mono', monospace;
+    }
+
+    .badge-islem {
+        display: inline-block;
+        padding: 0.15rem 0.45rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        background: rgba(255, 255, 255, 0.05);
+        color: #cbd5e1;
+    }
+</style>
+
+<div class="ekstre-container">
+    <!-- Sayfa Başlığı -->
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <div style="background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+                📑
+            </div>
+            <div>
+                <h1 style="font-size: 1.5rem; margin: 0; color: #fff;">Cari Hesap Ekstresi</h1>
+                <p style="font-size: 0.85rem; margin: 0; color: var(--text-muted);">Müşteri/Tedarikçi cari hesap hareketleri, devir bakiyesi ve hesap dökümü.</p>
+            </div>
+        </div>
+
+        <div>
+            <button class="btn btn-outline" id="btn-excel" onclick="exportToExcel()" style="border-color: #059669; color: #34d399;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Excel Olarak İndir
+            </button>
+        </div>
+    </div>
+
+    <!-- Filtreleme ve Cari Seçimi Barı -->
+    <div class="filter-card">
+        <div class="filter-row">
+            <div class="filter-item" style="width: 100px;">
+                <label class="filter-label">Mali Yıl</label>
+                <select id="yearSelect" class="select-custom">
+                    <option value="2026" selected>2026</option>
+                    <option value="2025">2025</option>
+                </select>
+            </div>
+
+            <div class="filter-item" style="width: 150px;">
+                <label class="filter-label">Başlangıç Tarihi</label>
+                <input type="date" id="dateInput" class="input-date" value="2026-01-01">
+            </div>
+
+            <div class="filter-item" style="flex: 1; min-width: 320px;">
+                <label class="filter-label">Cari Hesap Kartı</label>
+                <select id="cariSelect" style="width: 100%;">
+                    <option value="">Cari Yükleniyor...</option>
+                </select>
+            </div>
+
+            <div class="filter-item" style="align-self: flex-end;">
+                <button type="button" class="btn btn-primary" onclick="loadEkstreData()" style="height: 40px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    Sorgula
+                </button>
+            </div>
+        </div>
+
+        <!-- Özet KPI Kartları (Sorgu sonrası görünür) -->
+        <div class="summary-grid" id="summary-section" style="display: none;">
+            <div class="kpi-card">
+                <span class="kpi-title">Toplam Borç</span>
+                <span class="kpi-value borc" id="stat-borc">0,00 ₺</span>
+            </div>
+            <div class="kpi-card">
+                <span class="kpi-title">Toplam Alacak</span>
+                <span class="kpi-value alacak" id="stat-alacak">0,00 ₺</span>
+            </div>
+            <div class="kpi-card" style="border-color: rgba(59, 130, 246, 0.4); background: rgba(59, 130, 246, 0.05);">
+                <span class="kpi-title">Kümülatif Bakiye</span>
+                <span class="kpi-value bakiye" id="stat-bakiye">0,00 ₺</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Veri Tablosu Alanı -->
+    <div class="table-card">
+        <div class="table-responsive" id="table-wrapper">
+            <div style="text-align: center; padding: 4rem 2rem; color: var(--text-muted);">
+                <div style="font-size: 2.5rem; margin-bottom: 0.5rem; opacity: 0.5;">🔍</div>
+                <div style="font-size: 1rem; font-weight: 500;">Listelemek istediğiniz cari kartı yukarıdan seçip "Sorgula" butonuna basın.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        // Select2 Başlat
+        $('#cariSelect').select2({
+            placeholder: "Cari Ünvan veya Kod Yazarak Arayın...",
+            allowClear: true
+        });
+
+        // Carileri API'den Yükle
+        function loadCariList() {
+            const year = $('#yearSelect').val();
+            $('#cariSelect').html('<option value="">Cariler yükleniyor...</option>');
+            
+            $.getJSON(`/finans/api/cariler?year=${year}`, function(data) {
+                let options = '<option value="">-- Cari Hesap Seçiniz --</option>';
+                if (data && data.length > 0) {
+                    data.forEach(c => {
+                        options += `<option value="${c.CODE}">${c.CODE} - ${c.DEFINITION_}</option>`;
+                    });
+                } else {
+                    options = '<option value="">Cari kart bulunamadı (Veritabanı bağlantısını kontrol edin)</option>';
+                }
+                $('#cariSelect').html(options).trigger('change');
+            }).fail(function() {
+                $('#cariSelect').html('<option value="">Cariler yüklenirken hata oluştu.</option>');
+            });
+        }
+
+        loadCariList();
+
+        $('#yearSelect').on('change', function() {
+            const y = $(this).val();
+            $('#dateInput').val(`${y}-01-01`);
+            loadCariList();
+        });
+
+        $('#cariSelect').on('change', function() {
+            if ($(this).val()) {
+                loadEkstreData();
+            }
+        });
+    });
+
+    // Cari Ekstre Sorgusunu Çalıştır
+    function loadEkstreData() {
+        const cari = $('#cariSelect').val();
+        const year = $('#yearSelect').val();
+        const date = $('#dateInput').val();
+
+        if (!cari) {
+            alert('Lütfen listelemek istediğiniz cari kartı seçin.');
+            return;
+        }
+
+        $('#table-wrapper').html(`
+            <div style="text-align: center; padding: 4rem 2rem; color: #60a5fa;">
+                <div style="font-size: 2rem; animation: spin 1s linear infinite; display: inline-block;">⏳</div>
+                <div style="margin-top: 0.75rem; font-weight: 500;">SQL Server'dan hareketler çekiliyor, lütfen bekleyiniz...</div>
+            </div>
+        `);
+
+        $.getJSON(`/finans/api/cari-ekstre-data?year=${year}&date=${date}&cari=${encodeURIComponent(cari)}`, function(res) {
+            if (res.error) {
+                $('#table-wrapper').html(`
+                    <div style="text-align: center; padding: 3rem 2rem; color: #f87171;">
+                        <div style="font-size: 2rem; margin-bottom: 0.5rem;">⚠️</div>
+                        <div style="font-weight: 600;">Hata Oluştu:</div>
+                        <div style="font-size: 0.85rem; margin-top: 0.25rem;">${res.error}</div>
+                    </div>
+                `);
+                $('#summary-section').hide();
+            } else {
+                $('#table-wrapper').html(res.html);
+                $('#stat-borc').text(`${res.t_borc} ₺`);
+                $('#stat-alacak').text(`${res.t_alacak} ₺`);
+                $('#stat-bakiye').text(`${res.t_bakiye} ₺`);
+                $('#summary-section').show();
+            }
+        }).fail(function() {
+            $('#table-wrapper').html(`
+                <div style="text-align: center; padding: 3rem 2rem; color: #f87171;">
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">❌</div>
+                    <div>Sunucuya erişilemedi veya sorgu zaman aşımına uğradı.</div>
+                </div>
+            `);
+            $('#summary-section').hide();
+        });
+    }
+
+    // Excel İndirme
+    function exportToExcel() {
+        const cari = $('#cariSelect').val();
+        const year = $('#yearSelect').val();
+        const date = $('#dateInput').val();
+
+        if (!cari) {
+            alert('Lütfen önce bir cari seçin.');
+            return;
+        }
+
+        window.location.href = `/finans/cari-ekstre/export?year=${year}&date=${date}&cari=${encodeURIComponent(cari)}`;
+    }
+</script>
+{% endblock %}

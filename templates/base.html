@@ -127,6 +127,56 @@
             gap: 1rem;
         }
 
+        .nav-dropdown {
+            position: relative;
+        }
+
+        .nav-dropdown-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            cursor: pointer;
+        }
+
+        .nav-dropdown-menu {
+            display: none;
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 0;
+            background-color: #1e293b;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            min-width: 230px;
+            box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.5);
+            z-index: 50;
+            overflow: hidden;
+        }
+
+        .nav-dropdown:hover .nav-dropdown-menu,
+        .nav-dropdown.show .nav-dropdown-menu {
+            display: block;
+            animation: fadeIn 0.15s ease-out;
+        }
+
+        .nav-dropdown-menu a {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.75rem 1rem;
+            color: var(--text-main);
+            text-decoration: none;
+            font-size: 0.875rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.15s ease;
+            border-radius: 0;
+        }
+
+        .nav-dropdown-menu a:hover {
+            background-color: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            padding-left: 1.25rem;
+        }
+
         .param-dropdown {
             position: relative;
             display: inline-block;
@@ -205,7 +255,37 @@
                 <ul>
                     <li><a href="/" class="{% if aktif_sayfa == 'index' %}active{% endif %}">Ana Sayfa</a></li>
                     <li><a href="/muhasebe" class="{% if aktif_sayfa == 'muhasebe' %}active{% endif %}">Muhasebe</a></li>
-                    <li><a href="/finans" class="{% if aktif_sayfa == 'finans' %}active{% endif %}">Finans</a></li>
+                    <li class="nav-dropdown">
+                        <a href="/finans" class="nav-dropdown-toggle {% if aktif_sayfa in ['finans', 'cari_ekstre', 'cari_kapama'] %}active{% endif %}">
+                            <span>Finans</span>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </a>
+                        <div class="nav-dropdown-menu">
+                            <a href="/finans/cari-ekstre">
+                                <span style="font-size: 1.1rem;">📑</span>
+                                <div>
+                                    <div style="font-weight: 600;">Cari Hesap Ekstresi</div>
+                                    <div style="font-size: 0.75rem; color: var(--text-muted);">Cari kart hareketleri ve bakiye dökümü</div>
+                                </div>
+                            </a>
+                            <a href="/finans/cari-kapama">
+                                <span style="font-size: 1.1rem;">🔄</span>
+                                <div>
+                                    <div style="font-weight: 600;">Cari Hesap Kapama</div>
+                                    <div style="font-size: 0.75rem; color: var(--text-muted);">Fatura ve tahsilat/ödeme eşleştirme</div>
+                                </div>
+                            </a>
+                            <a href="/finans">
+                                <span style="font-size: 1.1rem;">📊</span>
+                                <div>
+                                    <div style="font-weight: 600;">Finans Genel Görünüm</div>
+                                    <div style="font-size: 0.75rem; color: var(--text-muted);">Nakit akışı ve özet paneli</div>
+                                </div>
+                            </a>
+                        </div>
+                    </li>
                     <li><a href="/raporlar" class="{% if aktif_sayfa == 'raporlar' %}active{% endif %}">Raporlar</a></li>
                     <li><a href="/parametreler" class="{% if aktif_sayfa == 'parametreler' %}active{% endif %}">Parametreler</a></li>
                 </ul>
