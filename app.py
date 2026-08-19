@@ -1,6 +1,79 @@
-from flask import Flask, render_template
+import json
+import os
+import time
+import urllib.parse
+from flask import Flask, render_template, request, jsonify
+from sqlalchemy import create_engine, text
 
 app = Flask(__name__)
+CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'db_config.json')
+
+DEFAULT_CONNECTIONS = [
+    {
+        "id": 1,
+        "name": "1. SQL Bağlantısı (Ana Veritabanı)",
+        "driver": "ODBC Driver 17 for SQL Server",
+        "server": "UFUK-SERVER",
+        "port": "1433",
+        "database": "UFUK2025",
+        "username": "MDT_REPORT",
+        "password": "MDT_REPORT",
+        "trusted_connection": False,
+        "trust_server_certificate": True,
+        "timeout": 5,
+        "is_active": True
+    },
+    {
+        "id": 2,
+        "name": "2. SQL Bağlantısı (Nexlog Veritabanı)",
+        "driver": "ODBC Driver 17 for SQL Server",
+        "server": "UFUK-SERVER",
+        "port": "1433",
+        "database": "NEXLOG",
+        "username": "MDT_REPORT",
+        "password": "MDT_REPORT",
+        "trusted_connection": False,
+        "trust_server_certificate": True,
+        "timeout": 5,
+        "is_active": True
+    },
+    {
+        "id": 3,
+        "name": "3. SQL Bağlantısı (Rapor / Arşiv DB)",
+        "driver": "ODBC Driver 17 for SQL Server",
+        "server": "UFUK-SERVER",
+        "port": "1433",
+        "database": "RAPORDB",
+        "username": "sa",
+        "password": "",
+        "trusted_connection": False,
+        "trust_server_certificate": True,
+        "timeout": 5,
+        "is_active": False
+    }
+]
+
+def load_db_config():
+    if not os.path.exists(CONFIG_FILE):
+        save_db_config(DEFAULT_CONNECTIONS)
+        return DEFAULT_CONNECTIONS
+    try:
+        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            if isinstance(data, list) and len(data) >= 3:
+                return data
+            return DEFAULT_CONNECTIONS
+    except Exception:
+        return DEFAULT_CONNECTIONS
+
+def save_db_config(connections):
+    try:
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(connections, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        print(f"Config kaydetme hatası: {e}")
+        return False
 
 @app.route('/')
 def index():
@@ -20,7 +93,102 @@ def raporlar():
 
 @app.route('/parametreler')
 def parametreler():
-    return render_template('parametreler.html', aktif_sayfa='parametreler')
+    connections = load_db_config()
+    return render_template('parametreler.html', aktif_sayfa='parametreler', connections=connections)
+
+@app.route('/api/db-connections/save', methods=['POST'])
+def save_connections_api():
+    try:
+        data = request.get_json()
+        if not data or 'connections' not in data:
+            return jsonify({'success': False, 'message': 'Geçersiz veri gönderildi.'}), 400
+        
+        connections = data['connections']
+        if save_db_config(connections):
+            return jsonify({'success': True, 'message': 'Bağlantı parametreleri başarıyla kaydedildi.'})
+        else:
+            return jsonify({'success': False, 'message': 'Dosyaya yazılamadı.'}), 500
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Hata oluştu: {str(e)}'}), 500
+
+@app.route('/api/db-connections/test', methods=['POST'])
+def test_connection_api():
+    try:
+        conn_data = request.get_json()
+        if not conn_data:
+            return jsonify({'success': False, 'message': 'Bağlantı bilgisi bulunamadı.'}), 400
+        
+        driver = conn_data.get('driver', 'SQL Server')
+        server = conn_data.get('server', '').strip()
+        port = conn_data.get('port', '').strip()
+        database = conn_data.get('database', '').strip()
+        username = conn_data.get('username', '').strip()
+        password = conn_data.get('password', '')
+        trusted_conn = conn_data.get('trusted_connection', False)
+        trust_cert = conn_data.get('trust_server_certificate', True)
+        timeout = int(conn_data.get('timeout', 5))
+
+        if not server:
+            return jsonify({'success': False, 'message': 'Sunucu (Server) adresi boş bırakılamaz.'}), 400
+        if not database:
+            return jsonify({'success': False, 'message': 'Veritabanı (Database) adı boş bırakılamaz.'}), 400
+
+        server_part = f"{server},{port}" if port and port != "1433" else server
+
+        params_parts = [
+            f"DRIVER={{{driver}}}",
+            f"SERVER={server_part}",
+            f"DATABASE={database}"
+        ]
+
+        if trusted_conn:
+            params_parts.append("Trusted_Connection=yes")
+        else:
+            if not username:
+                return jsonify({'success': False, 'message': 'Kullanıcı adı boş bırakılamaz.'}), 400
+            params_parts.append(f"UID={username}")
+            params_parts.append(f"PWD={password}")
+
+        if trust_cert:
+            params_parts.append("TrustServerCertificate=yes")
+
+        connection_str = ";".join(params_parts) + ";"
+        encoded_params = urllib.parse.quote_plus(connection_str)
+        conn_uri = f"mssql+pyodbc:///?odbc_connect={encoded_params}"
+
+        start_time = time.time()
+        engine = create_engine(conn_uri, connect_args={"timeout": timeout})
+        
+        with engine.connect() as conn:
+            result = conn.execute(text("SELECT @@VERSION AS ver, DB_NAME() AS dbname")).fetchone()
+            version_info = result[0].split('\n')[0] if result and result[0] else 'Bilinmiyor'
+            current_db = result[1] if result and len(result) > 1 else database
+
+        elapsed_ms = round((time.time() - start_time) * 1000)
+        return jsonify({
+            'success': True,
+            'message': f"Bağlantı başarılı! ({elapsed_ms} ms)",
+            'version': version_info,
+            'database': current_db,
+            'latency_ms': elapsed_ms
+        })
+    except Exception as e:
+        err_msg = str(e)
+        # Clean up odbc / driver error messages for clarity
+        if "[SQL Server]" in err_msg:
+            err_msg = err_msg.split("[SQL Server]")[-1].split("[SQLState")[0].strip()
+        elif "Login failed" in err_msg:
+            err_msg = "Kullanıcı adı veya şifre hatalı."
+        elif "Cannot open database" in err_msg:
+            err_msg = "Belirtilen veritabanı bulunamadı veya erişim yetkisi yok."
+        elif "Server is not found" in err_msg or "error: 08001" in err_msg:
+            err_msg = "Sunucuya erişilemedi. Sunucu adı ve ağ bağlantınızı kontrol edin."
+
+        return jsonify({
+            'success': False,
+            'message': f"Bağlantı hatası: {err_msg}"
+        })
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True)
+

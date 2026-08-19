@@ -188,20 +188,48 @@
                     <li><a href="/muhasebe" class="{% if aktif_sayfa == 'muhasebe' %}active{% endif %}">Muhasebe</a></li>
                     <li><a href="/finans" class="{% if aktif_sayfa == 'finans' %}active{% endif %}">Finans</a></li>
                     <li><a href="/raporlar" class="{% if aktif_sayfa == 'raporlar' %}active{% endif %}">Raporlar</a></li>
+                    <li><a href="/parametreler" class="{% if aktif_sayfa == 'parametreler' %}active{% endif %}">Parametreler</a></li>
                 </ul>
             </nav>
         </div>
 
         <div class="header-right">
-            <!-- Sağ Üst Parametre Yapısı -->
+            <!-- Sağ Üst Parametre Dropdown Menüsü -->
             <div class="param-dropdown" id="paramDropdown">
-                <a href="/parametreler" class="param-btn {% if aktif_sayfa == 'parametreler' %}active{% endif %}" id="paramBtn">
+                <button type="button" class="param-btn {% if aktif_sayfa == 'parametreler' %}active{% endif %}" id="paramBtn" onclick="toggleParamDropdown(event)">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="3"></circle>
                         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                     </svg>
                     <span>Parametreler</span>
-                </a>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 2px;">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                </button>
+                <div class="param-menu" id="paramMenu">
+                    <a href="/parametreler#baglanti" onclick="selectParamTab('tab-baglanti')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+                        </svg>
+                        <span>🔌 SQL Bağlantı Ayarları</span>
+                    </a>
+                    <a href="/parametreler#genel" onclick="selectParamTab('tab-genel')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                        </svg>
+                        <span>⚙️ Genel Parametreler</span>
+                    </a>
+                    <a href="/parametreler#guvenlik" onclick="selectParamTab('tab-guvenlik')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                        <span>🔒 Güvenlik & Yetkiler</span>
+                    </a>
+                </div>
             </div>
         </div>
     </header>
@@ -209,5 +237,32 @@
     <main>
         {% block content %}{% endblock %}
     </main>
+
+    <script>
+        function toggleParamDropdown(e) {
+            e.stopPropagation();
+            const menu = document.getElementById('paramMenu');
+            menu.classList.toggle('show');
+        }
+
+        window.addEventListener('click', function(e) {
+            const menu = document.getElementById('paramMenu');
+            if (menu && menu.classList.contains('show')) {
+                if (!e.target.closest('#paramDropdown')) {
+                    menu.classList.remove('show');
+                }
+            }
+        });
+
+        function selectParamTab(tabId) {
+            if (window.location.pathname === '/parametreler') {
+                if (typeof switchTabById === 'function') {
+                    switchTabById(tabId);
+                }
+                const menu = document.getElementById('paramMenu');
+                if (menu) menu.classList.remove('show');
+            }
+        }
+    </script>
 </body>
 </html>

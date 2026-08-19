@@ -1,16 +1,845 @@
 {% extends "base.html" %}
 
-{% block title %}Parametreler - Yönetim Paneli{% endblock %}
+{% block title %}Parametreler - Bağlantı Ayarları{% endblock %}
 
 {% block content %}
-<div class="card">
-    <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-        </svg>
-        <h1 style="margin-bottom: 0;">Parametreler</h1>
+<style>
+    /* Tab ve Konfigürasyon Tasarımı */
+    .param-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .param-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .param-title-wrap {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .tabs-nav {
+        display: flex;
+        gap: 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 0.5rem;
+        margin-bottom: 1rem;
+        overflow-x: auto;
+    }
+
+    .tab-btn {
+        background: transparent;
+        border: 1px solid transparent;
+        color: var(--text-muted);
+        padding: 0.65rem 1.2rem;
+        border-radius: 0.5rem;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all 0.2s ease;
+    }
+
+    .tab-btn:hover {
+        color: var(--text-main);
+        background-color: rgba(255, 255, 255, 0.05);
+    }
+
+    .tab-btn.active {
+        color: #ffffff;
+        background-color: var(--accent);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+    }
+
+    .tab-content {
+        display: none;
+    }
+
+    .tab-content.active {
+        display: block;
+        animation: fadeIn 0.25s ease-out;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(4px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Grid Yapısı (3 SQL Bağlantısı için) */
+    .connections-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .conn-card {
+        background: linear-gradient(145deg, #1e293b, #172033);
+        border: 1px solid var(--border-color);
+        border-radius: 0.85rem;
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+        position: relative;
+        transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+
+    .conn-card:hover {
+        border-color: #475569;
+        transform: translateY(-2px);
+    }
+
+    .conn-card.active-connection {
+        border-color: rgba(59, 130, 246, 0.5);
+    }
+
+    .conn-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        padding-bottom: 0.85rem;
+        margin-bottom: 1.25rem;
+    }
+
+    .conn-number-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        background: rgba(59, 130, 246, 0.15);
+        color: #60a5fa;
+        font-weight: 700;
+        font-size: 0.85rem;
+        border-radius: 6px;
+        border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .conn-title-input {
+        background: transparent;
+        border: 1px dashed transparent;
+        color: #ffffff;
+        font-size: 1rem;
+        font-weight: 600;
+        padding: 0.2rem 0.4rem;
+        border-radius: 4px;
+        width: 100%;
+        margin-left: 0.5rem;
+    }
+
+    .conn-title-input:hover, .conn-title-input:focus {
+        background: rgba(15, 23, 42, 0.6);
+        border-color: var(--border-color);
+        outline: none;
+    }
+
+    .form-group {
+        margin-bottom: 1rem;
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 0.75rem;
+    }
+
+    .form-label {
+        display: block;
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: var(--text-muted);
+        margin-bottom: 0.35rem;
+    }
+
+    .form-control {
+        width: 100%;
+        background-color: #0f172a;
+        border: 1px solid var(--border-color);
+        color: #f8fafc;
+        padding: 0.55rem 0.75rem;
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+        font-family: inherit;
+        transition: all 0.15s ease;
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+    }
+
+    .password-wrapper {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+
+    .password-toggle {
+        position: absolute;
+        right: 0.6rem;
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        padding: 0.25rem;
+        display: flex;
+        align-items: center;
+    }
+
+    .password-toggle:hover {
+        color: #f8fafc;
+    }
+
+    .checkbox-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+        margin: 0.75rem 0 1rem 0;
+        padding: 0.75rem;
+        background: rgba(15, 23, 42, 0.4);
+        border-radius: 0.5rem;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .checkbox-label input {
+        cursor: pointer;
+        accent-color: var(--accent);
+    }
+
+    /* Test Sonuç Paneli */
+    .test-result-box {
+        margin-top: 0.75rem;
+        padding: 0.6rem 0.75rem;
+        border-radius: 0.5rem;
+        font-size: 0.8rem;
+        display: none;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .test-result-box.success {
+        display: flex;
+        background: rgba(16, 185, 129, 0.1);
+        border: 1px solid rgba(16, 185, 129, 0.3);
+        color: #34d399;
+    }
+
+    .test-result-box.error {
+        display: flex;
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        color: #f87171;
+    }
+
+    .test-result-box.loading {
+        display: flex;
+        background: rgba(59, 130, 246, 0.1);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        color: #60a5fa;
+    }
+
+    /* Butonlar */
+    .card-actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 1.25rem;
+        padding-top: 1rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        padding: 0.55rem 1rem;
+        border-radius: 0.5rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        border: none;
+    }
+
+    .btn-primary {
+        background-color: var(--accent);
+        color: #ffffff;
+    }
+
+    .btn-primary:hover {
+        background-color: var(--accent-hover);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+
+    .btn-outline {
+        background-color: transparent;
+        color: var(--text-main);
+        border: 1px solid var(--border-color);
+    }
+
+    .btn-outline:hover {
+        background-color: rgba(255, 255, 255, 0.05);
+        border-color: #64748b;
+    }
+
+    .btn-test {
+        background-color: rgba(59, 130, 246, 0.12);
+        color: #60a5fa;
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        flex: 1;
+    }
+
+    .btn-test:hover {
+        background-color: rgba(59, 130, 246, 0.25);
+    }
+
+    /* Switch Toggle */
+    .switch {
+        position: relative;
+        display: inline-block;
+        width: 36px;
+        height: 20px;
+    }
+
+    .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background-color: #334155;
+        transition: .3s;
+        border-radius: 20px;
+    }
+
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 14px;
+        width: 14px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: .3s;
+        border-radius: 50%;
+    }
+
+    input:checked + .slider {
+        background-color: #10b981;
+    }
+
+    input:checked + .slider:before {
+        transform: translateX(16px);
+    }
+
+    /* Status Badge */
+    .status-badge {
+        font-size: 0.75rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 9999px;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-weight: 500;
+    }
+
+    .status-badge.untested {
+        background: rgba(148, 163, 184, 0.1);
+        color: #94a3b8;
+    }
+
+    .status-badge.ok {
+        background: rgba(16, 185, 129, 0.15);
+        color: #34d399;
+    }
+
+    .status-badge.fail {
+        background: rgba(239, 68, 68, 0.15);
+        color: #f87171;
+    }
+
+    /* Toast Bildirim */
+    #toast-container {
+        position: fixed;
+        bottom: 2rem;
+        right: 2rem;
+        z-index: 100;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .toast {
+        min-width: 280px;
+        padding: 0.85rem 1.25rem;
+        border-radius: 0.5rem;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-size: 0.875rem;
+        animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        color: #fff;
+    }
+
+    .toast.success { background-color: #065f46; border: 1px solid #10b981; }
+    .toast.error { background-color: #7f1d1d; border: 1px solid #ef4444; }
+    .toast.info { background-color: #1e3a8a; border: 1px solid #3b82f6; }
+
+    @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+</style>
+
+<div class="param-container">
+    <!-- Sayfa Başlığı ve Global Eylemler -->
+    <div class="param-header">
+        <div class="param-title-wrap">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+            <div>
+                <h1 style="margin-bottom: 0.15rem; font-size: 1.6rem;">Sistem Parametreleri</h1>
+                <p style="font-size: 0.85rem; margin: 0;">Sistem, veritabanı bağlantıları ve genel modül ayarları.</p>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 0.75rem;">
+            <button class="btn btn-outline" id="btn-test-all" onclick="testAllConnections()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+                Tümünü Test Et
+            </button>
+            <button class="btn btn-primary" id="btn-save-all" onclick="saveAllConnections()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                    <polyline points="7 3 7 8 15 8"></polyline>
+                </svg>
+                Tüm Bağlantıları Kaydet
+            </button>
+        </div>
     </div>
-    <p>Sistem ve modül parametreleri bu alanda yapılandırılacaktır. İçerik ve ayar alanları tanımlanmaya hazırdır.</p>
+
+    <!-- Sekmeler (Tabs) -->
+    <div class="tabs-nav">
+        <button class="tab-btn active" id="btn-tab-baglanti" onclick="switchTab('tab-baglanti', this)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+            </svg>
+            Bağlantı
+        </button>
+        <button class="tab-btn" id="btn-tab-genel" onclick="switchTab('tab-genel', this)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+            Genel Ayarlar
+        </button>
+        <button class="tab-btn" id="btn-tab-guvenlik" onclick="switchTab('tab-guvenlik', this)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+            Güvenlik & Yetkiler
+        </button>
+    </div>
+
+    <!-- 1. SEKME: BAĞLANTI (3 SQL Bağlantı Yapısı) -->
+    <div id="tab-baglanti" class="tab-content active">
+        <div style="margin-bottom: 1.25rem; background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.2); padding: 0.85rem 1.25rem; border-radius: 0.6rem; display: flex; align-items: center; justify-content: space-between;">
+            <div style="font-size: 0.875rem; color: #93c5fd;">
+                <strong>💡 SQL Bağlantı Yönetimi:</strong> Uygulamanın kullandığı 3 farklı SQL veritabanı bağlantısını aşağıdan yapılandırabilir, test edebilir ve kaydedebilirsiniz.
+            </div>
+        </div>
+
+        <div class="connections-grid" id="connections-form-container">
+            {% for conn in connections %}
+            <div class="conn-card {% if conn.is_active %}active-connection{% endif %}" id="conn-card-{{ loop.index }}" data-conn-id="{{ conn.id or loop.index }}">
+                <div>
+                    <!-- Kart Başlığı -->
+                    <div class="conn-header">
+                        <div style="display: flex; align-items: center; flex: 1;">
+                            <span class="conn-number-badge">#{{ loop.index }}</span>
+                            <input type="text" class="conn-title-input" id="name-{{ loop.index }}" value="{{ conn.name }}" placeholder="Bağlantı Adı">
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <label class="switch" title="Aktif / Pasif">
+                                <input type="checkbox" id="active-{{ loop.index }}" {% if conn.is_active %}checked{% endif %} onchange="toggleCardActiveState({{ loop.index }})">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Driver Seçimi -->
+                    <div class="form-group">
+                        <label class="form-label">ODBC Sürücüsü (Driver)</label>
+                        <select class="form-control" id="driver-{{ loop.index }}">
+                            <option value="ODBC Driver 17 for SQL Server" {% if conn.driver == 'ODBC Driver 17 for SQL Server' %}selected{% endif %}>ODBC Driver 17 for SQL Server</option>
+                            <option value="SQL Server" {% if conn.driver == 'SQL Server' %}selected{% endif %}>SQL Server (Eski Sürücü)</option>
+                            <option value="ODBC Driver 18 for SQL Server" {% if conn.driver == 'ODBC Driver 18 for SQL Server' %}selected{% endif %}>ODBC Driver 18 for SQL Server</option>
+                        </select>
+                    </div>
+
+                    <!-- Sunucu ve Port -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Sunucu Adı / IP (Server)</label>
+                            <input type="text" class="form-control" id="server-{{ loop.index }}" value="{{ conn.server }}" placeholder="örn: UFUK-SERVER veya 192.168.1.100">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Port</label>
+                            <input type="text" class="form-control" id="port-{{ loop.index }}" value="{{ conn.port or '1433' }}" placeholder="1433">
+                        </div>
+                    </div>
+
+                    <!-- Database -->
+                    <div class="form-group">
+                        <label class="form-label">Veritabanı Adı (Database)</label>
+                        <input type="text" class="form-control" id="database-{{ loop.index }}" value="{{ conn.database }}" placeholder="örn: UFUK2025 veya NEXLOG">
+                    </div>
+
+                    <!-- Kullanıcı Adı & Şifre -->
+                    <div class="form-group">
+                        <label class="form-label">Kullanıcı Adı (UID)</label>
+                        <input type="text" class="form-control" id="username-{{ loop.index }}" value="{{ conn.username }}" placeholder="örn: sa veya MDT_REPORT" {% if conn.trusted_connection %}disabled{% endif %}>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Şifre (PWD)</label>
+                        <div class="password-wrapper">
+                            <input type="password" class="form-control" id="password-{{ loop.index }}" value="{{ conn.password }}" placeholder="••••••••" {% if conn.trusted_connection %}disabled{% endif %}>
+                            <button type="button" class="password-toggle" onclick="togglePasswordVisibility({{ loop.index }})">
+                                <svg id="eye-icon-{{ loop.index }}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Opsiyonlar -->
+                    <div class="checkbox-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="trusted-{{ loop.index }}" {% if conn.trusted_connection %}checked{% endif %} onchange="toggleTrustedConnection({{ loop.index }})">
+                            <span>Windows Kimlik Doğrulama (Trusted Connection)</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="trust-cert-{{ loop.index }}" {% if conn.trust_server_certificate %}checked{% endif %}>
+                            <span>Sertifikaya Güven (TrustServerCertificate)</span>
+                        </label>
+                    </div>
+
+                    <!-- Test Sonuç Kutusu -->
+                    <div class="test-result-box" id="result-box-{{ loop.index }}">
+                        <span id="result-icon-{{ loop.index }}"></span>
+                        <span id="result-text-{{ loop.index }}"></span>
+                    </div>
+                </div>
+
+                <!-- Aksiyonlar -->
+                <div class="card-actions">
+                    <button type="button" class="btn btn-test" id="btn-test-{{ loop.index }}" onclick="testSingleConnection({{ loop.index }})">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                        </svg>
+                        Test Et
+                    </button>
+                    <span class="status-badge untested" id="status-badge-{{ loop.index }}">
+                        ● Test Edilmedi
+                    </span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- 2. SEKME: GENEL AYARLAR -->
+    <div id="tab-genel" class="tab-content">
+        <div class="card">
+            <h2 style="font-size: 1.25rem; margin-bottom: 0.75rem;">Genel Sistem Ayarları</h2>
+            <p style="margin-bottom: 1.5rem;">Sistem genelinde geçerli olan temel para birimi, tarih formatı ve yenileme sıklığı ayarları.</p>
+            
+            <div style="max-width: 500px;">
+                <div class="form-group">
+                    <label class="form-label">Varsayılan Para Birimi</label>
+                    <select class="form-control">
+                        <option value="TRY">TRY (₺) - Türk Lirası</option>
+                        <option value="USD">USD ($) - Amerikan Doları</option>
+                        <option value="EUR">EUR (€) - Euro</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Veri Yenileme Periyodu (Dakika)</label>
+                    <input type="number" class="form-control" value="5" min="1" max="60">
+                </div>
+                <button class="btn btn-primary" onclick="showToast('Genel ayarlar güncellendi.', 'success')">Genel Ayarları Kaydet</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. SEKME: GÜVENLİK & YETKİLER -->
+    <div id="tab-guvenlik" class="tab-content">
+        <div class="card">
+            <h2 style="font-size: 1.25rem; margin-bottom: 0.75rem;">Güvenlik ve Yetkilendirme</h2>
+            <p>Kullanıcı rolleri, oturum zaman aşımı ve erişim loglama yapılandırması.</p>
+            <div style="margin-top: 1rem; color: var(--text-muted); font-size: 0.9rem;">
+                Yetkilendirme yönetimi aktif konfigürasyon modundadır.
+            </div>
+        </div>
+    </div>
 </div>
+
+<!-- Toast Bildirim Alanı -->
+<div id="toast-container"></div>
+
+<script>
+    // Tab Değiştirme Fonksiyonları
+    function switchTab(tabId, btnElement) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+        
+        if (btnElement) {
+            btnElement.classList.add('active');
+        }
+        const target = document.getElementById(tabId);
+        if (target) {
+            target.classList.add('active');
+        }
+    }
+
+    function switchTabById(tabId) {
+        const btn = document.getElementById(`btn-${tabId}`);
+        switchTab(tabId, btn);
+    }
+
+    // URL Hash kontrolü (örn: #baglanti, #genel)
+    window.addEventListener('DOMContentLoaded', () => {
+        const hash = window.location.hash.replace('#', '');
+        if (hash) {
+            const targetTabId = `tab-${hash}`;
+            if (document.getElementById(targetTabId)) {
+                switchTabById(targetTabId);
+            }
+        }
+    });
+
+    window.addEventListener('hashchange', () => {
+        const hash = window.location.hash.replace('#', '');
+        if (hash) {
+            const targetTabId = `tab-${hash}`;
+            if (document.getElementById(targetTabId)) {
+                switchTabById(targetTabId);
+            }
+        }
+    });
+
+    // Şifre Göster / Gizle
+    function togglePasswordVisibility(index) {
+        const passInput = document.getElementById(`password-${index}`);
+        const eyeIcon = document.getElementById(`eye-icon-${index}`);
+        
+        if (passInput.type === 'password') {
+            passInput.type = 'text';
+            eyeIcon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>';
+        } else {
+            passInput.type = 'password';
+            eyeIcon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+        }
+    }
+
+    // Windows Auth değiştiğinde kullanıcı adı / şifre disable
+    function toggleTrustedConnection(index) {
+        const trusted = document.getElementById(`trusted-${index}`).checked;
+        const userInput = document.getElementById(`username-${index}`);
+        const passInput = document.getElementById(`password-${index}`);
+        
+        userInput.disabled = trusted;
+        passInput.disabled = trusted;
+    }
+
+    // Aktif / Pasif Kart Görünümü
+    function toggleCardActiveState(index) {
+        const card = document.getElementById(`conn-card-${index}`);
+        const isChecked = document.getElementById(`active-${index}`).checked;
+        if (isChecked) {
+            card.classList.add('active-connection');
+        } else {
+            card.classList.remove('active-connection');
+        }
+    }
+
+    // Tekil Bağlantı Verisini Al
+    function getConnectionData(index) {
+        return {
+            id: index,
+            name: document.getElementById(`name-${index}`).value.trim() || `${index}. SQL Bağlantısı`,
+            driver: document.getElementById(`driver-${index}`).value,
+            server: document.getElementById(`server-${index}`).value.trim(),
+            port: document.getElementById(`port-${index}`).value.trim(),
+            database: document.getElementById(`database-${index}`).value.trim(),
+            username: document.getElementById(`username-${index}`).value.trim(),
+            password: document.getElementById(`password-${index}`).value,
+            trusted_connection: document.getElementById(`trusted-${index}`).checked,
+            trust_server_certificate: document.getElementById(`trust-cert-${index}`).checked,
+            timeout: 5,
+            is_active: document.getElementById(`active-${index}`).checked
+        };
+    }
+
+    // Tekil Bağlantıyı Test Et
+    async function testSingleConnection(index) {
+        const data = getConnectionData(index);
+        const resultBox = document.getElementById(`result-box-${index}`);
+        const resultText = document.getElementById(`result-text-${index}`);
+        const statusBadge = document.getElementById(`status-badge-${index}`);
+        const testBtn = document.getElementById(`btn-test-${index}`);
+
+        testBtn.disabled = true;
+        resultBox.className = 'test-result-box loading';
+        resultText.innerText = 'Bağlantı kuruluyor...';
+        statusBadge.className = 'status-badge untested';
+        statusBadge.innerText = '● Test Ediliyor';
+
+        try {
+            const response = await fetch('/api/db-connections/test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            const resData = await response.json();
+
+            if (resData.success) {
+                resultBox.className = 'test-result-box success';
+                resultText.innerText = `${resData.message} (DB: ${resData.database})`;
+                statusBadge.className = 'status-badge ok';
+                statusBadge.innerText = `● Başarılı (${resData.latency_ms} ms)`;
+                showToast(`${data.name}: Bağlantı başarılı!`, 'success');
+            } else {
+                resultBox.className = 'test-result-box error';
+                resultText.innerText = resData.message;
+                statusBadge.className = 'status-badge fail';
+                statusBadge.innerText = '● Hata';
+                showToast(`${data.name}: ${resData.message}`, 'error');
+            }
+        } catch (err) {
+            resultBox.className = 'test-result-box error';
+            resultText.innerText = 'Sunucuya ulaşılamadı veya ağ hatası.';
+            statusBadge.className = 'status-badge fail';
+            statusBadge.innerText = '● Hata';
+            showToast(`${data.name}: Ağ hatası oluştu.`, 'error');
+        } finally {
+            testBtn.disabled = false;
+        }
+    }
+
+    // Tüm Bağlantıları Test Et
+    async function testAllConnections() {
+        const btn = document.getElementById('btn-test-all');
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Test Ediliyor...';
+
+        for (let i = 1; i <= 3; i++) {
+            await testSingleConnection(i);
+        }
+
+        btn.disabled = false;
+        btn.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg> Tümünü Test Et`;
+    }
+
+    // Tüm Bağlantıları Kaydet
+    async function saveAllConnections() {
+        const saveBtn = document.getElementById('btn-save-all');
+        saveBtn.disabled = true;
+        saveBtn.innerText = 'Kaydediliyor...';
+
+        const connections = [
+            getConnectionData(1),
+            getConnectionData(2),
+            getConnectionData(3)
+        ];
+
+        try {
+            const response = await fetch('/api/db-connections/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ connections })
+            });
+
+            const resData = await response.json();
+            if (resData.success) {
+                showToast(resData.message, 'success');
+            } else {
+                showToast(resData.message, 'error');
+            }
+        } catch (err) {
+            showToast('Kaydetme sırasında bir hata oluştu.', 'error');
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                    <polyline points="7 3 7 8 15 8"></polyline>
+                </svg> Tüm Bağlantıları Kaydet`;
+        }
+    }
+
+    // Toast Bildirim Fonksiyonu
+    function showToast(message, type = 'info') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        
+        let icon = 'ℹ️';
+        if (type === 'success') icon = '✅';
+        if (type === 'error') icon = '⚠️';
+
+        toast.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
+        container.appendChild(toast);
+
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(10px)';
+            toast.style.transition = 'all 0.3s ease';
+            setTimeout(() => toast.remove(), 300);
+        }, 4000);
+    }
+</script>
 {% endblock %}

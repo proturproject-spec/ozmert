@@ -1,0 +1,44 @@
+[
+  {
+    "database": "UFUK2025",
+    "driver": "ODBC Driver 17 for SQL Server",
+    "id": 1,
+    "is_active": true,
+    "name": "1. SQL Bağlantısı (Ana Veritabanı)",
+    "password": "MDT_REPORT",
+    "port": "1433",
+    "server": "UFUK-SERVER",
+    "timeout": 5,
+    "trust_server_certificate": true,
+    "trusted_connection": false,
+    "username": "MDT_REPORT"
+  },
+  {
+    "database": "NEXLOG",
+    "driver": "ODBC Driver 17 for SQL Server",
+    "id": 2,
+    "is_active": true,
+    "name": "2. SQL Bağlantısı (Nexlog Veritabanı)",
+    "password": "MDT_REPORT",
+    "port": "1433",
+    "server": "UFUK-SERVER",
+    "timeout": 5,
+    "trust_server_certificate": true,
+    "trusted_connection": false,
+    "username": "MDT_REPORT"
+  },
+  {
+    "database": "RAPORDB",
+    "driver": "ODBC Driver 17 for SQL Server",
+    "id": 3,
+    "is_active": false,
+    "name": "3. SQL Bağlantısı (Rapor / Arşiv DB)",
+    "password": "",
+    "port": "1433",
+    "server": "UFUK-SERVER",
+    "timeout": 5,
+    "trust_server_certificate": true,
+    "trusted_connection": false,
+    "username": "sa"
+  }
+]
