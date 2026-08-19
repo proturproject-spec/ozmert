@@ -279,6 +279,42 @@
                 if (menu) menu.classList.remove('show');
             }
         }
+
+        // --- 5 DAKİKA HAREKETSİZLİK & SAYFA GÜVENLİK ZAMANLAYICISI ---
+        (function() {
+            let inactivitySeconds = 0;
+            const MAX_INACTIVITY_SECONDS = 300; // 5 Dakika (300 saniye)
+
+            function resetInactivity() {
+                inactivitySeconds = 0;
+            }
+
+            // Fare, klavye, tıklama, kaydırma ve dokunma hareketlerinde süreyi sıfırla
+            window.addEventListener('mousemove', resetInactivity, { passive: true });
+            window.addEventListener('keydown', resetInactivity, { passive: true });
+            window.addEventListener('click', resetInactivity, { passive: true });
+            window.addEventListener('scroll', resetInactivity, { passive: true });
+            window.addEventListener('touchstart', resetInactivity, { passive: true });
+
+            setInterval(() => {
+                inactivitySeconds += 1;
+                if (inactivitySeconds >= MAX_INACTIVITY_SECONDS) {
+                    window.location.href = '/logout?timeout=1';
+                }
+            }, 1000);
+
+            // Sekme değiştirilip 5 dakika sonra geri gelindiğinde kontrol et
+            let lastActiveTime = Date.now();
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) {
+                    const elapsed = (Date.now() - lastActiveTime) / 1000;
+                    if (elapsed >= MAX_INACTIVITY_SECONDS) {
+                        window.location.href = '/logout?timeout=1';
+                    }
+                }
+                lastActiveTime = Date.now();
+            });
+        })();
     </script>
 </body>
 </html>

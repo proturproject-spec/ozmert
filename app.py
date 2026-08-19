@@ -1,6 +1,7 @@
 import json
 import os
 import time
+from datetime import timedelta
 from functools import wraps
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -10,6 +11,12 @@ from db_manager import load_db_config, save_db_config, build_connection_uri, get
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'finans_muhasebe_secret_key_2025_secure_xyz')
 
+# Güvenlik Ayarları: Sayfa kapanınca oturum silinir, maksimum 5 dakika işlem yapılmazsa kilitlenir
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=5)
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+INACTIVITY_TIMEOUT_SECONDS = 300  # 5 Dakika (300 saniye)
 USERS_FILE = os.path.join(os.path.dirname(__file__), 'users.json')
 
 def load_users():
@@ -64,25 +71,38 @@ def require_login():
     if 'user' not in session:
         return redirect(url_for('login', next=request.url))
 
+    # 5 Dakika Hareketsizlik / Zaman Aşımı Kontrolü
+    now = time.time()
+    last_active = session.get('last_active')
+    if last_active and (now - last_active) > INACTIVITY_TIMEOUT_SECONDS:
+        session.clear()
+        return redirect(url_for('login', timeout=1))
+
+    session['last_active'] = now
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if 'user' in session:
         return redirect(url_for('index'))
     
     error = None
+    if request.args.get('timeout'):
+        error = 'Güvenlik gereği oturumunuz 5 dakika işlem yapılmadığı için sonlandırıldı. Lütfen tekrar şifre girin.'
+
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
-        remember = request.form.get('remember')
 
         user = authenticate_user(username, password)
         if user:
-            session.permanent = bool(remember)
+            # Tarayıcı veya sekme kapandığında oturumun silinmesi için permanent=False
+            session.permanent = False
             session['user'] = {
                 'username': user.get('username'),
                 'name': user.get('name', username),
                 'role': user.get('role', 'user')
             }
+            session['last_active'] = time.time()
             next_url = request.args.get('next') or url_for('index')
             return redirect(next_url)
         else:
@@ -93,6 +113,9 @@ def login():
 @app.route('/logout')
 def logout():
     session.clear()
+    timeout = request.args.get('timeout')
+    if timeout:
+        return redirect(url_for('login', timeout=1))
     return redirect(url_for('login'))
 
 @app.route('/')
