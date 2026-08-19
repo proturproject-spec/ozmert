@@ -102,19 +102,108 @@
             color: var(--text-muted);
             line-height: 1.6;
         }
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .param-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .param-btn {
+            background-color: rgba(59, 130, 246, 0.1);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+
+        .param-btn:hover, .param-btn.active {
+            background-color: var(--accent);
+            color: #ffffff;
+            border-color: var(--accent);
+        }
+
+        .param-menu {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: calc(100% + 8px);
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            min-width: 220px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+            z-index: 50;
+            overflow: hidden;
+        }
+
+        .param-menu.show {
+            display: block;
+        }
+
+        .param-menu a {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1rem;
+            color: var(--text-main);
+            text-decoration: none;
+            font-size: 0.875rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            transition: background 0.15s ease;
+        }
+
+        .param-menu a:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+            color: #60a5fa;
+        }
+
+        .param-menu .param-placeholder {
+            padding: 0.75rem 1rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
     <header>
-        <a href="/" class="logo">⚡ Finans & Muhasebe Paneli</a>
-        <nav>
-            <ul>
-                <li><a href="/" class="{% if aktif_sayfa == 'index' %}active{% endif %}">Ana Sayfa</a></li>
-                <li><a href="/muhasebe" class="{% if aktif_sayfa == 'muhasebe' %}active{% endif %}">Muhasebe</a></li>
-                <li><a href="/finans" class="{% if aktif_sayfa == 'finans' %}active{% endif %}">Finans</a></li>
-                <li><a href="/raporlar" class="{% if aktif_sayfa == 'raporlar' %}active{% endif %}">Raporlar</a></li>
-            </ul>
-        </nav>
+        <div style="display: flex; align-items: center; gap: 2rem;">
+            <a href="/" class="logo">⚡ Finans & Muhasebe Paneli</a>
+            <nav>
+                <ul>
+                    <li><a href="/" class="{% if aktif_sayfa == 'index' %}active{% endif %}">Ana Sayfa</a></li>
+                    <li><a href="/muhasebe" class="{% if aktif_sayfa == 'muhasebe' %}active{% endif %}">Muhasebe</a></li>
+                    <li><a href="/finans" class="{% if aktif_sayfa == 'finans' %}active{% endif %}">Finans</a></li>
+                    <li><a href="/raporlar" class="{% if aktif_sayfa == 'raporlar' %}active{% endif %}">Raporlar</a></li>
+                </ul>
+            </nav>
+        </div>
+
+        <div class="header-right">
+            <!-- Sağ Üst Parametre Yapısı -->
+            <div class="param-dropdown" id="paramDropdown">
+                <a href="/parametreler" class="param-btn {% if aktif_sayfa == 'parametreler' %}active{% endif %}" id="paramBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                    <span>Parametreler</span>
+                </a>
+            </div>
+        </div>
     </header>
 
     <main>

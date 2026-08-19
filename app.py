@@ -18,5 +18,9 @@ def finans():
 def raporlar():
     return render_template('raporlar.html', aktif_sayfa='raporlar')
 
+@app.route('/parametreler')
+def parametreler():
+    return render_template('parametreler.html', aktif_sayfa='parametreler')
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True)
