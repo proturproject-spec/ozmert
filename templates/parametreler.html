@@ -612,12 +612,38 @@
 
     <!-- 3. SEKME: GÜVENLİK & YETKİLER -->
     <div id="tab-guvenlik" class="tab-content">
-        <div class="card">
-            <h2 style="font-size: 1.25rem; margin-bottom: 0.75rem;">Güvenlik ve Yetkilendirme</h2>
-            <p>Kullanıcı rolleri, oturum zaman aşımı ve erişim loglama yapılandırması.</p>
-            <div style="margin-top: 1rem; color: var(--text-muted); font-size: 0.9rem;">
-                Yetkilendirme yönetimi aktif konfigürasyon modundadır.
-            </div>
+        <div class="card" style="max-width: 550px;">
+            <h2 style="font-size: 1.25rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+                Şifre Değiştir
+            </h2>
+            <p style="margin-bottom: 1.5rem; font-size: 0.875rem;">Oturum açmış olan kullanıcının giriş şifresini bu alandan güncelleyebilirsiniz.</p>
+            
+            <form id="change-password-form" onsubmit="handleChangePassword(event)">
+                <div class="form-group">
+                    <label class="form-label">Mevcut Şifre</label>
+                    <input type="password" class="form-control" id="old-password" placeholder="••••••••" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Yeni Şifre</label>
+                    <input type="password" class="form-control" id="new-password" placeholder="En az 4 karakter" minlength="4" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Yeni Şifre (Tekrar)</label>
+                    <input type="password" class="form-control" id="confirm-password" placeholder="••••••••" minlength="4" required>
+                </div>
+                <button type="submit" class="btn btn-primary" id="btn-change-password">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                        <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                        <polyline points="7 3 7 8 15 8"></polyline>
+                    </svg>
+                    Şifreyi Güncelle
+                </button>
+            </form>
         </div>
     </div>
 </div>
@@ -818,6 +844,52 @@
                     <polyline points="17 21 17 13 7 13 7 21"></polyline>
                     <polyline points="7 3 7 8 15 8"></polyline>
                 </svg> Tüm Bağlantıları Kaydet`;
+        }
+    }
+
+    // Şifre Değiştirme
+    async function handleChangePassword(e) {
+        e.preventDefault();
+        const oldPassword = document.getElementById('old-password').value;
+        const newPassword = document.getElementById('new-password').value;
+        const confirmPassword = document.getElementById('confirm-password').value;
+        const btn = document.getElementById('btn-change-password');
+
+        if (newPassword !== confirmPassword) {
+            showToast('Yeni şifreler birbiriyle uyuşmuyor.', 'error');
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerText = 'Güncelleniyor...';
+
+        try {
+            const response = await fetch('/api/change-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    old_password: oldPassword,
+                    new_password: newPassword
+                })
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                showToast(data.message, 'success');
+                document.getElementById('change-password-form').reset();
+            } else {
+                showToast(data.message, 'error');
+            }
+        } catch (err) {
+            showToast('Şifre değiştirilirken bir hata oluştu.', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                    <polyline points="7 3 7 8 15 8"></polyline>
+                </svg> Şifreyi Güncelle`;
         }
     }
 

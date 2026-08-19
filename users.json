@@ -1,0 +1,8 @@
+[
+  {
+    "username": "admin",
+    "password_hash": "scrypt:32768:8:1$Z2wvE2mo0Qq2wFzG$9b372f73ea4429fc657ceefaa3a025a8182484675f6218490d4b03eb60b1b2e492104057f14380f54b2b4f7fd6091088761d83322e417dc18d6833c17b2be48a",
+    "name": "Yonetici (Admin)",
+    "role": "admin"
+  }
+]

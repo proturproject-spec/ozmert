@@ -2,11 +2,16 @@ import json
 import os
 import time
 import urllib.parse
-from flask import Flask, render_template, request, jsonify
+from functools import wraps
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
+from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import create_engine, text
 
 app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', 'finans_muhasebe_secret_key_2025_secure_xyz')
+
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'db_config.json')
+USERS_FILE = os.path.join(os.path.dirname(__file__), 'users.json')
 
 DEFAULT_CONNECTIONS = [
     {
@@ -53,6 +58,41 @@ DEFAULT_CONNECTIONS = [
     }
 ]
 
+def load_users():
+    if not os.path.exists(USERS_FILE):
+        default_users = [
+            {
+                "username": "admin",
+                "password_hash": generate_password_hash("admin123"),
+                "name": "Yönetici (Admin)",
+                "role": "admin"
+            }
+        ]
+        save_users(default_users)
+        return default_users
+    try:
+        with open(USERS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+def save_users(users):
+    try:
+        with open(USERS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(users, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        print(f"Kullanıcı kaydetme hatası: {e}")
+        return False
+
+def authenticate_user(username, password):
+    users = load_users()
+    for user in users:
+        if user.get('username') == username:
+            if check_password_hash(user.get('password_hash', ''), password):
+                return user
+    return None
+
 def load_db_config():
     if not os.path.exists(CONFIG_FILE):
         save_db_config(DEFAULT_CONNECTIONS)
@@ -75,6 +115,54 @@ def save_db_config(connections):
         print(f"Config kaydetme hatası: {e}")
         return False
 
+@app.context_processor
+def inject_user():
+    return {
+        'current_user': session.get('user')
+    }
+
+@app.before_request
+def require_login():
+    # İzin verilen açık rotalar
+    allowed_endpoints = ['login', 'static']
+    if request.endpoint and (request.endpoint in allowed_endpoints or request.endpoint.startswith('static')):
+        return None
+    
+    # Giriş kontrolü
+    if 'user' not in session:
+        return redirect(url_for('login', next=request.url))
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if 'user' in session:
+        return redirect(url_for('index'))
+    
+    error = None
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        remember = request.form.get('remember')
+
+        user = authenticate_user(username, password)
+        if user:
+            session.permanent = bool(remember)
+            session['user'] = {
+                'username': user.get('username'),
+                'name': user.get('name', username),
+                'role': user.get('role', 'user')
+            }
+            next_url = request.args.get('next') or url_for('index')
+            return redirect(next_url)
+        else:
+            error = 'Kullanıcı adı veya şifre hatalı. Lütfen tekrar deneyin.'
+
+    return render_template('login.html', error=error)
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
 @app.route('/')
 def index():
     return render_template('index.html', aktif_sayfa='index')
@@ -95,6 +183,37 @@ def raporlar():
 def parametreler():
     connections = load_db_config()
     return render_template('parametreler.html', aktif_sayfa='parametreler', connections=connections)
+
+@app.route('/api/change-password', methods=['POST'])
+def change_password():
+    if 'user' not in session:
+        return jsonify({'success': False, 'message': 'Oturum bulunamadı.'}), 401
+    
+    data = request.get_json() or {}
+    old_password = data.get('old_password', '')
+    new_password = data.get('new_password', '')
+
+    if not old_password or not new_password:
+        return jsonify({'success': False, 'message': 'Eski ve yeni şifre alanları zorunludur.'}), 400
+
+    if len(new_password) < 4:
+        return jsonify({'success': False, 'message': 'Yeni şifre en az 4 karakter olmalıdır.'}), 400
+
+    current_username = session['user']['username']
+    users = load_users()
+    user_found = False
+
+    for user in users:
+        if user.get('username') == current_username:
+            if not check_password_hash(user.get('password_hash', ''), old_password):
+                return jsonify({'success': False, 'message': 'Mevcut şifreniz hatalı.'}), 400
+            user['password_hash'] = generate_password_hash(new_password)
+            user_found = True
+            break
+
+    if user_found and save_users(users):
+        return jsonify({'success': True, 'message': 'Şifreniz başarıyla değiştirildi.'})
+    return jsonify({'success': False, 'message': 'Şifre güncellenemedi.'}), 500
 
 @app.route('/api/db-connections/save', methods=['POST'])
 def save_connections_api():
@@ -174,7 +293,6 @@ def test_connection_api():
         })
     except Exception as e:
         err_msg = str(e)
-        # Clean up odbc / driver error messages for clarity
         if "[SQL Server]" in err_msg:
             err_msg = err_msg.split("[SQL Server]")[-1].split("[SQLState")[0].strip()
         elif "Login failed" in err_msg:
@@ -191,4 +309,3 @@ def test_connection_api():
 
 if __name__ == '__main__':
     app.run(debug=True)
-
