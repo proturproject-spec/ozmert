@@ -581,5 +581,54 @@ def test_connection_api():
             'message': f"Bağlantı hatası: {err_msg}"
         })
 
+
+# =============================================================
+# SQL KÖPRÜ ENDPOINTLERİ (Lokal bilgisayarda çalışır, Render buna bağlanır)
+# Bu endpointler sadece doğru API key ile çalışır
+# =============================================================
+
+@app.route('/bridge/health')
+def bridge_health():
+    return jsonify({'status': 'ok', 'service': 'SQL Bridge'})
+
+@app.route('/bridge/cariler')
+def bridge_cariler():
+    key = request.headers.get('X-Bridge-Key') or request.args.get('key', '')
+    if key != BRIDGE_KEY:
+        return jsonify({'error': 'Yetkisiz'}), 401
+    year = request.args.get('year', '2026')
+    try:
+        engine = get_engine(1)
+        cards_q, _, _ = get_cari_queries(year)
+        with engine.connect() as conn:
+            cariler = pd.read_sql(text(cards_q), conn).to_dict(orient='records')
+        return jsonify(cariler)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/bridge/cari-ekstre')
+def bridge_cari_ekstre():
+    key = request.headers.get('X-Bridge-Key') or request.args.get('key', '')
+    if key != BRIDGE_KEY:
+        return jsonify({'error': 'Yetkisiz'}), 401
+    year = request.args.get('year', '2026')
+    date_val = request.args.get('date', f'{year}-01-01')
+    cari = request.args.get('cari', '').strip()
+    if not cari:
+        return jsonify({'error': 'Cari kodu eksik'}), 400
+    try:
+        engine = get_engine(1)
+        _, base_q, devir_q = get_cari_queries(year)
+        params = {'cari_code': cari, 'date': date_val}
+        with engine.connect() as conn:
+            devir_res = conn.execute(text(devir_q), params).fetchone()
+            devir = float(devir_res[0] or 0) if devir_res and devir_res[0] is not None else 0.0
+            df = pd.read_sql(text(base_q), conn, params=params)
+        if 'TARIH' in df.columns:
+            df['TARIH'] = df['TARIH'].astype(str)
+        return jsonify({'rows': df.to_dict(orient='records'), 'devir': devir})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     app.run(debug=True)
