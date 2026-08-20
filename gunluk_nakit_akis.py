@@ -7,6 +7,22 @@ import re
 import pandas as pd
 import urllib
 from datetime import datetime, timedelta
+import requests as _bridge_requests
+
+# --- Bridge Konfigürasyonu (Render ortamı için) ---
+_BRIDGE_URL = os.environ.get('BRIDGE_URL', '').rstrip('/')
+_BRIDGE_KEY = os.environ.get('BRIDGE_API_KEY', 'nexlog_bridge_2026_secure_xKj9')
+_USE_BRIDGE = bool(_BRIDGE_URL)
+
+def _bridge_get(path, params=None, timeout=30):
+    """Bridge API'den GET isteği yapar."""
+    resp = _bridge_requests.get(
+        f"{_BRIDGE_URL}{path}",
+        params=params or {},
+        headers={'X-Bridge-Key': _BRIDGE_KEY},
+        timeout=timeout
+    )
+    return resp.json()
 
 try:
     from export_eski_sablon import generate_eski_sablon_excel
@@ -171,6 +187,17 @@ def get_first_business_day(d):
     return datetime(d_date.year, d_date.month, d_date.day)
 
 def get_own_check_details(target_date, limit_date=True):
+    if _USE_BRIDGE:
+        try:
+            data = _bridge_get('/bridge/nakit/own-checks', {'date': target_date, 'limit_date': str(limit_date).lower()})
+            df = pd.DataFrame(data.get('rows', []))
+            if not df.empty and 'VADE' in df.columns:
+                df['VADE'] = pd.to_datetime(df['VADE'], errors='coerce')
+                df['VADE'] = df['VADE'].apply(get_first_business_day)
+            return df
+        except Exception as e:
+            print(f"Bridge own-checks hata: {e}")
+            return pd.DataFrame()
     # limit_date=True: sadece seçilen tarihe eşit vadeli çekler (o günün ödemeleri)
     # limit_date=False: tüm gelecek vadeli çekler (rapor için)
     if limit_date:
@@ -320,6 +347,16 @@ def get_customer_check_details(target_date, limit_date=True):
     return df
 
 def get_credit_details(target_date, limit_date=True):
+    if _USE_BRIDGE:
+        try:
+            data = _bridge_get('/bridge/nakit/credits', {'date': target_date, 'limit_date': str(limit_date).lower()})
+            df = pd.DataFrame(data.get('rows', []))
+            if not df.empty and 'VADE' in df.columns:
+                df['VADE'] = pd.to_datetime(df['VADE'], errors='coerce')
+            return df
+        except Exception as e:
+            print(f"Bridge credits hata: {e}")
+            return pd.DataFrame()
     date_filter = f"WHERE CONVERT(VARCHAR, P.DUEDATE, 23) <= '{target_date}'" if limit_date else ""
     query = f"""
     SELECT 
@@ -341,6 +378,19 @@ def get_credit_details(target_date, limit_date=True):
         return pd.read_sql(text(query), conn)
 
 def get_credit_card_details(target_date, limit_date=True):
+    if _USE_BRIDGE:
+        try:
+            data = _bridge_get('/bridge/nakit/credit-cards', {'date': target_date, 'limit_date': str(limit_date).lower()})
+            df = pd.DataFrame(data.get('rows', []))
+            if not df.empty:
+                today = datetime.now().date()
+                if 'VADE' in df.columns:
+                    df['VADE'] = pd.to_datetime(df['VADE'], errors='coerce')
+                    df['KALAN_GUN'] = (df['VADE'].dt.date - today).apply(lambda x: x.days)
+            return df
+        except Exception as e:
+            print(f"Bridge credit-cards hata: {e}")
+            return pd.DataFrame()
     today = datetime.now().date()
     date_filter = f"AND CONVERT(VARCHAR, KSV.MAX_DATE, 23) <= '{target_date}'" if limit_date else ""
     query = f"""
@@ -384,6 +434,13 @@ def get_credit_card_details(target_date, limit_date=True):
         return df
 
 def get_bank_balances():
+    if _USE_BRIDGE:
+        try:
+            data = _bridge_get('/bridge/nakit/bank-balances')
+            return pd.DataFrame(data.get('rows', []))
+        except Exception as e:
+            print(f"Bridge bank-balances hata: {e}")
+            return pd.DataFrame()
     query = f"""
     SELECT 
         BC.DEFINITION_ AS BANKA_ADI,
@@ -419,6 +476,13 @@ def get_bank_balances():
         return pd.read_sql(text(query), conn)
 
 def get_kasa_balances(target_date=None):
+    if _USE_BRIDGE:
+        try:
+            data = _bridge_get('/bridge/nakit/kasa-balances', {'date': target_date or ''})
+            return pd.DataFrame(data.get('rows', []))
+        except Exception as e:
+            print(f"Bridge kasa-balances hata: {e}")
+            return pd.DataFrame()
     date_filter = f"AND CONVERT(VARCHAR, KS.DATE_, 23) <= '{target_date}'" if target_date else ""
     query = f"""
     SELECT 
@@ -440,6 +504,12 @@ def get_kasa_balances(target_date=None):
         return pd.read_sql(text(query), conn)
 
 def get_receivables_balances():
+    if _USE_BRIDGE:
+        try:
+            return _bridge_get('/bridge/nakit/receivables')
+        except Exception as e:
+            print(f"Bridge receivables hata: {e}")
+            return {'TL': 0.0, 'USD': 0.0, 'EUR': 0.0}
     query = f"""
     SELECT
         SUM(CASE WHEN CL.CODE LIKE '120.01.%' THEN (CASE WHEN CLF.SIGN = 0 THEN CLF.AMOUNT ELSE -CLF.AMOUNT END) ELSE 0 END) AS BAKIYE_TL,
@@ -462,6 +532,13 @@ def get_receivables_balances():
         return {'TL': 0.0, 'USD': 0.0, 'EUR': 0.0}
 
 def get_open_payables_balances():
+    if _USE_BRIDGE:
+        try:
+            return _bridge_get('/bridge/nakit/payables')
+        except Exception as e:
+            print(f"Bridge payables hata: {e}")
+            empty_val = {'TL': 0.0, 'USD': 0.0, 'EUR': 0.0}
+            return {'akaryakit': empty_val, 'sigorta': empty_val, 'sanayi': empty_val, 'navlun': empty_val}
     query = f"""
     SELECT
         -- TL balances
@@ -539,6 +616,37 @@ def get_virman_lists(target_date):
     Çıkan bankaları (SIGN=1) sağ liste (outgoing_virman) için hazırlar.
     Karşı banka adını (KARSI_BANKA) her iki tarafa da otomatik iliştirir.
     """
+    if _USE_BRIDGE:
+        try:
+            data = _bridge_get('/bridge/nakit/virman', {'date': target_date})
+            rows = data.get('rows', [])
+            incoming_virman = []
+            outgoing_virman = []
+            if rows:
+                import itertools
+                from itertools import groupby
+                for sf_ref, group in itertools.groupby(rows, key=lambda r: r.get('SOURCEFREF')):
+                    group = list(group)
+                    inc_rows = [r for r in group if r.get('SIGN') == 0]
+                    out_rows = [r for r in group if r.get('SIGN') == 1]
+                    out_bank_names = ", ".join([clean_bank_name(r['HESAP_ACIKLAMASI']) for r in out_rows if r.get('HESAP_ACIKLAMASI')])
+                    inc_bank_names = ", ".join([clean_bank_name(r['HESAP_ACIKLAMASI']) for r in inc_rows if r.get('HESAP_ACIKLAMASI')])
+                    for r in inc_rows:
+                        r_copy = dict(r)
+                        r_copy['HESAP_ACIKLAMASI'] = clean_bank_name(r_copy.get('HESAP_ACIKLAMASI', ''))
+                        r_copy['KARSI_BANKA'] = out_bank_names or '-'
+                        r_copy['FIS_TURU'] = 'Banka Virman Girişi'
+                        incoming_virman.append(r_copy)
+                    for r in out_rows:
+                        r_copy = dict(r)
+                        r_copy['HESAP_ACIKLAMASI'] = clean_bank_name(r_copy.get('HESAP_ACIKLAMASI', ''))
+                        r_copy['KARSI_BANKA'] = inc_bank_names or '-'
+                        r_copy['FIS_TURU'] = 'Banka Virman Çıkışı'
+                        outgoing_virman.append(r_copy)
+            return incoming_virman, outgoing_virman
+        except Exception as e:
+            print(f"Bridge virman hata: {e}")
+            return [], []
     query = f"""
     SELECT
         BNFLINE.LOGICALREF,
@@ -604,6 +712,32 @@ def get_virman_lists(target_date):
         return [], []
 
 def get_incoming_transfers(target_date, filter_virman=False):
+    if _USE_BRIDGE:
+        try:
+            data = _bridge_get('/bridge/nakit/incoming', {'date': target_date, 'filter_virman': str(filter_virman).lower()})
+            rows = data.get('rows', [])
+            records = []
+            for r in rows:
+                hesap_kodu_str = str(r.get('HESAP_KODU') or '').strip()
+                fis_turu_str = str(r.get('FIS_TURU') or '').lower()
+                if hesap_kodu_str.startswith('50.') or 'kredi kart' in fis_turu_str:
+                    continue
+                if filter_virman:
+                    satir_str = str(r.get('SATIR_ACIKLAMASI') or '').lower()
+                    fis_str = str(r.get('FIS_ACIKLAMASI') or '').lower()
+                    if 'virman' in fis_turu_str or 'virman' in satir_str or 'virman' in fis_str:
+                        continue
+                doviz = str(r.get('HESAP_DOVIZI_RAPOR') or 'TL').strip()
+                if not doviz or doviz.lower() == 'nan':
+                    doviz = 'TL'
+                r['HESAP_DOVIZI_RAPOR'] = doviz
+                r['DOVIZLI_TUTAR'] = float(r.get('DOVIZLI_TUTAR') or 0.0)
+                r['TL_TUTAR'] = float(r.get('TL_TUTAR') or 0.0)
+                records.append(r)
+            return records
+        except Exception as e:
+            print(f"Bridge incoming hata: {e}")
+            return []
     virman_bank_filter = "AND BNFLINE.TRCODE NOT IN (2)" if filter_virman else ""
     virman_kasa_filter = "AND K.TRCODE NOT IN (61, 62, 63)" if filter_virman else ""
 
@@ -893,6 +1027,31 @@ def aggregate_harcirah_transfers(records):
         return records
 
 def get_outgoing_transfers(target_date, filter_virman=False, aggregate_navlun=False):
+    if _USE_BRIDGE:
+        try:
+            data = _bridge_get('/bridge/nakit/outgoing', {'date': target_date, 'filter_virman': str(filter_virman).lower()})
+            rows = data.get('rows', [])
+            records = []
+            for r in rows:
+                if filter_virman:
+                    fis_turu_str = str(r.get('FIS_TURU') or '').lower()
+                    satir_str = str(r.get('SATIR_ACIKLAMASI') or '').lower()
+                    fis_str = str(r.get('FIS_ACIKLAMASI') or '').lower()
+                    if 'virman' in fis_turu_str or 'virman' in satir_str or 'virman' in fis_str:
+                        continue
+                doviz = str(r.get('HESAP_DOVIZI_RAPOR') or 'TL').strip()
+                if not doviz or doviz.lower() == 'nan':
+                    doviz = 'TL'
+                r['HESAP_DOVIZI_RAPOR'] = doviz
+                r['DOVIZLI_TUTAR'] = abs(float(r.get('DOVIZLI_TUTAR') or 0.0))
+                r['TL_TUTAR'] = abs(float(r.get('TL_TUTAR') or 0.0))
+                records.append(r)
+            if aggregate_navlun:
+                records = aggregate_navlun_plate_transfers(records)
+            return aggregate_harcirah_transfers(records)
+        except Exception as e:
+            print(f"Bridge outgoing hata: {e}")
+            return []
     virman_bank_filter = "AND BNFLINE.TRCODE NOT IN (2)" if filter_virman else ""
     virman_kasa_filter = "AND K.TRCODE NOT IN (61, 62, 63)" if filter_virman else ""
 
@@ -1055,6 +1214,12 @@ def get_tcmb_rates():
     return {'USD': 0.0, 'EUR': 0.0}
 
 def get_unbilled_invoices_totals():
+    if _USE_BRIDGE:
+        try:
+            return _bridge_get('/bridge/nakit/unbilled')
+        except Exception as e:
+            print(f"Bridge unbilled hata: {e}")
+            return {'TL': 0.0, 'USD': 0.0, 'EUR': 0.0}
     query = """
     WITH LineTotals AS (
         SELECT 
