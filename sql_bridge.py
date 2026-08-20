@@ -658,6 +658,41 @@ def bridge_nakit_unbilled():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@bridge_app.route('/bridge/nakit/debug')
+def bridge_nakit_debug():
+    """Her endpoint'i tek tek test eder, hata varsa döner."""
+    if not verify_key():
+        return jsonify({'error': 'Yetkisiz erişim'}), 401
+    
+    results = {}
+    today = datetime.now().strftime('%Y-%m-%d')
+    
+    tests = {
+        'own_checks':       f"SELECT COUNT(*) FROM LG_{Firma}_{Donem}_CSCARD WHERE DOC IN (3,4) AND CURRSTAT NOT IN (8,6)",
+        'customer_checks':  f"SELECT COUNT(*) FROM LG_{Firma}_{Donem}_CSCARD WHERE DOC = 1 AND CURRSTAT NOT IN (2,6,8)",
+        'credits':          f"SELECT COUNT(*) FROM LG_{Firma}_BNCREPAYTR",
+        'bank_balances':    f"SELECT COUNT(*) FROM LG_{Firma}_BANKACC WHERE ACTIVE=0 AND CARDTYPE IN (1,3)",
+        'kasa_balances':    f"SELECT COUNT(*) FROM LG_{Firma}_KSCARD WHERE ACTIVE=0",
+        'receivables':      f"SELECT COUNT(*) FROM LG_{Firma}_{Donem}_CLFLINE WHERE CANCELLED=0",
+        'incoming_bank':    f"SELECT COUNT(*) FROM LG_{Firma}_{Donem}_BNFLINE WHERE SIGN=0 AND CONVERT(VARCHAR,DATE_,23)='{today}'",
+        'fn_trcode_exists': "SELECT COUNT(*) FROM sys.objects WHERE type='FN' AND name='fn_trcode'",
+        'db_name':          "SELECT DB_NAME()",
+    }
+    
+    try:
+        engine = get_engine_by_id(1)
+        with engine.connect() as conn:
+            for test_name, query in tests.items():
+                try:
+                    result = conn.execute(text(query)).fetchone()
+                    results[test_name] = str(result[0]) if result else 'NULL'
+                except Exception as e:
+                    results[test_name] = f'HATA: {str(e)}'
+    except Exception as e:
+        return jsonify({'connection_error': str(e)}), 500
+    
+    return jsonify({'firma': Firma, 'donem': Donem, 'test_date': today, 'results': results})
+
 if __name__ == '__main__':
     print("SQL Köprü API çalışıyor: http://127.0.0.1:5001")
     bridge_app.run(host='0.0.0.0', port=5001, debug=False)
