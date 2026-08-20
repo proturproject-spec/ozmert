@@ -19,7 +19,11 @@ def _bridge_get(path, params=None, timeout=30):
     resp = _bridge_requests.get(
         f"{_BRIDGE_URL}{path}",
         params=params or {},
-        headers={'X-Bridge-Key': _BRIDGE_KEY},
+        headers={
+            'X-Bridge-Key': _BRIDGE_KEY,
+            'ngrok-skip-browser-warning': 'true',
+            'User-Agent': 'NexlogBridgeClient/1.0'
+        },
         timeout=timeout
     )
     return resp.json()

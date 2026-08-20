@@ -942,5 +942,500 @@ def api_bridge_status():
     
     return jsonify(status)
 
+# ============================================================
+# NAKİT AKIŞ KÖPRÜ ENDPOINTLERİ (app.py port 5000 üzerinden de çalışır)
+# ============================================================
+
+Firma_Bridge = "226"
+Donem_Bridge = "01"
+
+def df_to_json_safe_app(df):
+    if df.empty:
+        return []
+    for col in df.columns:
+        if pd.api.types.is_datetime64_any_dtype(df[col]):
+            df[col] = df[col].astype(str)
+    return df.where(pd.notnull(df), None).to_dict(orient='records')
+
+@app.route('/bridge/nakit/own-checks')
+def bridge_nakit_own_checks():
+    key = request.headers.get('X-Bridge-Key') or request.args.get('key', '')
+    if key != BRIDGE_KEY:
+        return jsonify({'error': 'Yetkisiz erişim'}), 401
+    target_date = request.args.get('date', pd.Timestamp.now().strftime('%Y-%m-%d'))
+    limit_date = request.args.get('limit_date', 'true').lower() == 'true'
+    
+    date_filter = f"AND CONVERT(VARCHAR, CSC.DUEDATE, 23) <= '{target_date}'" if limit_date else ""
+    query = f"""
+    SELECT 
+        (SELECT TOP 1 CL.DEFINITION_ 
+         FROM LG_{Firma_Bridge}_CLCARD CL WITH(NOLOCK)
+         JOIN LG_{Firma_Bridge}_{Donem_Bridge}_CSTRANS CS WITH(NOLOCK) ON CL.LOGICALREF = CS.CARDREF 
+         WHERE CS.CSREF = CSC.LOGICALREF ORDER BY CS.LOGICALREF ASC) AS [CH_UNVANI], 
+        CSC.BANKNAME AS [BANKA], 
+        CONVERT(VARCHAR(10), CSC.DUEDATE, 23) AS [VADE], 
+        CSC.AMOUNT AS [TUTAR],
+        CSC.TRCURR AS [DOVIZ_TIPI]
+    FROM LG_{Firma_Bridge}_{Donem_Bridge}_CSCARD CSC WITH(NOLOCK)
+    WHERE CSC.DOC IN (3,4) AND CSC.CURRSTAT NOT IN (8, 6) {date_filter}
+    ORDER BY CSC.DUEDATE ASC
+    """
+    try:
+        engine = get_engine(1)
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return jsonify({'rows': df_to_json_safe_app(df)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/bridge/nakit/customer-checks')
+def bridge_nakit_customer_checks():
+    key = request.headers.get('X-Bridge-Key') or request.args.get('key', '')
+    if key != BRIDGE_KEY:
+        return jsonify({'error': 'Yetkisiz erişim'}), 401
+    target_date = request.args.get('date', pd.Timestamp.now().strftime('%Y-%m-%d'))
+    limit_date = request.args.get('limit_date', 'true').lower() == 'true'
+    
+    date_filter = f"AND CONVERT(VARCHAR, CSC.DUEDATE, 23) <= '{target_date}'" if limit_date else ""
+    query = f"""
+    SELECT 
+        (SELECT TOP 1 CL.DEFINITION_ FROM LG_{Firma_Bridge}_CLCARD CL WITH(NOLOCK)
+         JOIN LG_{Firma_Bridge}_{Donem_Bridge}_CSTRANS CS WITH(NOLOCK) ON CL.LOGICALREF = CS.CARDREF 
+         WHERE CS.CSREF = CSC.LOGICALREF AND CS.TRCODE = 1) AS [CH_UNVANI], 
+        CSC.BANKNAME AS [BANKA], 
+        (SELECT TOP 1 BA.DEFINITION_ FROM LG_{Firma_Bridge}_{Donem_Bridge}_CSTRANS CST WITH(NOLOCK)
+         JOIN LG_{Firma_Bridge}_BANKACC BA WITH(NOLOCK) ON BA.LOGICALREF = CST.CARDREF
+         WHERE CST.CSREF = CSC.LOGICALREF AND CST.STATUS = CSC.CURRSTAT AND CST.CARDMD = 7
+         ORDER BY CST.LOGICALREF DESC) AS [OUR_BANK],
+        CSC.NEWSERINO AS [CEK_NO],
+        CONVERT(VARCHAR(10), CSC.DUEDATE, 23) AS [VADE], 
+        CSC.AMOUNT AS [TUTAR],
+        CSC.TRCURR AS [DOVIZ_TIPI],
+        CSC.CURRSTAT AS [DURUM_KODU],
+        CASE CSC.CURRSTAT
+            WHEN 1 THEN 'Portföyde' WHEN 2 THEN 'Ciro Edildi'
+            WHEN 3 THEN 'Teminata Verildi' WHEN 4 THEN 'Tahsile Verildi'
+            WHEN 5 THEN 'Protestolu Tahsile Verildi' WHEN 6 THEN 'İade Edildi'
+            WHEN 7 THEN 'Protesto Edildi' WHEN 8 THEN 'Tahsil Edildi'
+            WHEN 9 THEN 'Kendi Çekimiz' WHEN 10 THEN 'Borç Senedimiz'
+            WHEN 11 THEN 'Karşılıksız' WHEN 12 THEN 'Tahsil Edilemiyor'
+            ELSE 'Bilinmeyen'
+        END AS [DURUM]
+    FROM LG_{Firma_Bridge}_{Donem_Bridge}_CSCARD CSC WITH(NOLOCK)
+    WHERE CSC.DOC = 1 AND CSC.CURRSTAT NOT IN (2, 6, 8) {date_filter}
+    ORDER BY CSC.DUEDATE ASC
+    """
+    try:
+        engine = get_engine(1)
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return jsonify({'rows': df_to_json_safe_app(df)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/bridge/nakit/credits')
+def bridge_nakit_credits():
+    key = request.headers.get('X-Bridge-Key') or request.args.get('key', '')
+    if key != BRIDGE_KEY:
+        return jsonify({'error': 'Yetkisiz erişim'}), 401
+    target_date = request.args.get('date', pd.Timestamp.now().strftime('%Y-%m-%d'))
+    limit_date = request.args.get('limit_date', 'true').lower() == 'true'
+    
+    date_filter = f"WHERE CONVERT(VARCHAR, P.DUEDATE, 23) <= '{target_date}'" if limit_date else ""
+    query = f"""
+    SELECT C.NAME_ AS [BANKA_KREDI],
+        CONVERT(VARCHAR(10), P.DUEDATE, 23) AS [VADE],
+        MAX(P.TOTAL) AS [ANAPARA], MAX(P.INTTOTAL) AS [FAIZ],
+        MAX(P.TOTAL + P.INTTOTAL) AS [TUTAR], MAX(C.TRCURR) AS [DOVIZ_TIPI]
+    FROM LG_{Firma_Bridge}_BNCREPAYTR P WITH(NOLOCK)
+    LEFT JOIN LG_{Firma_Bridge}_BNCREDITCARD C WITH(NOLOCK) ON C.LOGICALREF = P.CREDITREF
+    {date_filter}
+    GROUP BY C.CODE, C.NAME_, P.DUEDATE
+    HAVING MAX(P.TRANSTYPE) <> 1
+    ORDER BY P.DUEDATE ASC
+    """
+    try:
+        engine = get_engine(1)
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return jsonify({'rows': df_to_json_safe_app(df)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/bridge/nakit/credit-cards')
+def bridge_nakit_credit_cards():
+    key = request.headers.get('X-Bridge-Key') or request.args.get('key', '')
+    if key != BRIDGE_KEY:
+        return jsonify({'error': 'Yetkisiz erişim'}), 401
+    target_date = request.args.get('date', pd.Timestamp.now().strftime('%Y-%m-%d'))
+    limit_date = request.args.get('limit_date', 'true').lower() == 'true'
+    
+    date_filter = f"AND CONVERT(VARCHAR, KSV.MAX_DATE, 23) <= '{target_date}'" if limit_date else ""
+    query = f"""
+    WITH KartSonVade AS (
+        SELECT B.LOGICALREF AS BNACCREF, MAX(ISNULL(P.DATE_, F.DATE_)) AS MAX_DATE
+        FROM LG_{Firma_Bridge}_{Donem_Bridge}_BNFLINE F WITH(NOLOCK)
+        LEFT JOIN LG_{Firma_Bridge}_{Donem_Bridge}_PAYTRANS P WITH(NOLOCK) ON P.LOGICALREF = F.SOURCEFREF
+        LEFT JOIN LG_{Firma_Bridge}_BANKACC B WITH(NOLOCK) ON B.LOGICALREF = F.BNACCREF
+        WHERE B.CODE LIKE '50.%' AND F.CANCELLED = 0
+        GROUP BY B.LOGICALREF
+    )
+    SELECT B.DEFINITION_ AS [KARTI_ADI],
+        CONVERT(VARCHAR(10), KSV.MAX_DATE, 23) AS [VADE],
+        SUM(CASE WHEN F.SIGN = 0 THEN F.AMOUNT ELSE -F.AMOUNT END) AS [TUTAR]
+    FROM LG_{Firma_Bridge}_{Donem_Bridge}_BNFLINE F WITH(NOLOCK)
+    JOIN KartSonVade KSV ON KSV.BNACCREF = F.BNACCREF
+    LEFT JOIN LG_{Firma_Bridge}_BANKACC B WITH(NOLOCK) ON B.LOGICALREF = F.BNACCREF
+    WHERE F.CANCELLED = 0 {date_filter}
+    GROUP BY B.DEFINITION_, KSV.MAX_DATE
+    HAVING SUM(CASE WHEN F.SIGN = 0 THEN F.AMOUNT ELSE -F.AMOUNT END) > 0.01
+    ORDER BY KSV.MAX_DATE ASC
+    """
+    try:
+        engine = get_engine(1)
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return jsonify({'rows': df_to_json_safe_app(df)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/bridge/nakit/bank-balances')
+def bridge_nakit_bank_balances():
+    key = request.headers.get('X-Bridge-Key') or request.args.get('key', '')
+    if key != BRIDGE_KEY:
+        return jsonify({'error': 'Yetkisiz erişim'}), 401
+    query = f"""
+    SELECT BC.DEFINITION_ AS BANKA_ADI, BA.DEFINITION_ AS HESAP_ADI,
+        BA.IBAN AS IBAN, BA.CURRENCY AS DOVIZ_TIPI,
+        CASE WHEN BA.CURRENCY = 0 THEN ROUND(ISNULL(SUM(CASE BN.SIGN WHEN 0 THEN BN.AMOUNT ELSE -BN.AMOUNT END), 0), 2)
+             ELSE ROUND(ISNULL(SUM(CASE BN.SIGN WHEN 0 THEN BN.TRNET ELSE -BN.TRNET END), 0), 2) END AS BAKIYE
+    FROM LG_{Firma_Bridge}_BANKACC BA WITH(NOLOCK)
+    INNER JOIN LG_{Firma_Bridge}_BNCARD BC WITH(NOLOCK) ON BC.LOGICALREF = BA.BANKREF
+    LEFT JOIN LG_{Firma_Bridge}_{Donem_Bridge}_BNFLINE BN WITH(NOLOCK) ON BN.BNACCREF = BA.LOGICALREF AND BN.TRANSTYPE = 1 
+    WHERE BA.ACTIVE = 0 AND BA.CARDTYPE IN (1, 3) 
+    GROUP BY BA.CODE, BA.DEFINITION_, BC.CODE, BC.DEFINITION_, BA.CARDTYPE, BA.CURRENCY, BA.IBAN
+    HAVING ROUND(ISNULL(SUM(CASE BN.SIGN WHEN 0 THEN BN.AMOUNT ELSE -BN.AMOUNT END), 0), 2) <> 0
+        OR ROUND(ISNULL(SUM(CASE WHEN BA.CURRENCY = 0 THEN 0 ELSE (CASE BN.SIGN WHEN 0 THEN BN.TRNET ELSE -BN.TRNET END) END), 0), 2) <> 0
+    ORDER BY BA.CODE
+    """
+    try:
+        engine = get_engine(1)
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return jsonify({'rows': df_to_json_safe_app(df)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/bridge/nakit/kasa-balances')
+def bridge_nakit_kasa_balances():
+    key = request.headers.get('X-Bridge-Key') or request.args.get('key', '')
+    if key != BRIDGE_KEY:
+        return jsonify({'error': 'Yetkisiz erişim'}), 401
+    target_date = request.args.get('date', '')
+    date_filter = f"AND CONVERT(VARCHAR, KS.DATE_, 23) <= '{target_date}'" if target_date else ""
+    query = f"""
+    SELECT K.CCURRENCY AS DOVIZ_TIPI,
+        CASE WHEN K.CCURRENCY = 0 THEN ROUND(ISNULL(SUM(CASE WHEN KS.SIGN = 0 THEN KS.AMOUNT ELSE -KS.AMOUNT END), 0), 2)
+             ELSE ROUND(ISNULL(SUM(CASE WHEN KS.SIGN = 0 THEN KS.TRNET ELSE -KS.TRNET END), 0), 2) END AS BAKIYE
+    FROM LG_{Firma_Bridge}_KSCARD K WITH(NOLOCK)
+    LEFT JOIN LG_{Firma_Bridge}_{Donem_Bridge}_KSLINES KS WITH(NOLOCK) ON KS.CARDREF = K.LOGICALREF AND KS.CANCELLED = 0 {date_filter}
+    WHERE K.ACTIVE = 0 AND (K.CODE LIKE '100.01.%' OR K.NAME LIKE '%MERKEZ%')
+    GROUP BY K.CCURRENCY
+    """
+    try:
+        engine = get_engine(1)
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return jsonify({'rows': df_to_json_safe_app(df)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/bridge/nakit/receivables')
+def bridge_nakit_receivables():
+    key = request.headers.get('X-Bridge-Key') or request.args.get('key', '')
+    if key != BRIDGE_KEY:
+        return jsonify({'error': 'Yetkisiz erişim'}), 401
+    query = f"""
+    SELECT
+        SUM(CASE WHEN CL.CODE LIKE '120.01.%' THEN (CASE WHEN CLF.SIGN = 0 THEN CLF.AMOUNT ELSE -CLF.AMOUNT END) ELSE 0 END) AS BAKIYE_TL,
+        SUM(CASE WHEN CL.CODE LIKE '120.05.%' AND CLF.TRCURR = 1 THEN (CASE WHEN CLF.SIGN = 0 THEN CLF.TRNET ELSE -CLF.TRNET END) ELSE 0 END) AS BAKIYE_USD,
+        SUM(CASE WHEN CL.CODE LIKE '120.05.%' AND CLF.TRCURR = 20 THEN (CASE WHEN CLF.SIGN = 0 THEN CLF.TRNET ELSE -CLF.TRNET END) ELSE 0 END) AS BAKIYE_EUR
+    FROM LG_{Firma_Bridge}_CLCARD CL WITH(NOLOCK)
+    INNER JOIN LG_{Firma_Bridge}_{Donem_Bridge}_CLFLINE CLF WITH(NOLOCK) ON CLF.CLIENTREF = CL.LOGICALREF
+    WHERE CLF.CANCELLED = 0 AND CL.ACTIVE = 0 AND (CL.CODE LIKE '120.01.%' OR CL.CODE LIKE '120.05.%')
+    """
+    try:
+        engine = get_engine(1)
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        if not df.empty:
+            return jsonify({'TL': float(df.iloc[0]['BAKIYE_TL'] or 0.0), 'USD': float(df.iloc[0]['BAKIYE_USD'] or 0.0), 'EUR': float(df.iloc[0]['BAKIYE_EUR'] or 0.0)})
+        return jsonify({'TL': 0.0, 'USD': 0.0, 'EUR': 0.0})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/bridge/nakit/payables')
+def bridge_nakit_payables():
+    key = request.headers.get('X-Bridge-Key') or request.args.get('key', '')
+    if key != BRIDGE_KEY:
+        return jsonify({'error': 'Yetkisiz erişim'}), 401
+    query = f"""
+    SELECT
+        SUM(CASE WHEN CL.CODE LIKE '320.01.%' THEN (CASE WHEN CLF.SIGN = 1 THEN CLF.AMOUNT ELSE -CLF.AMOUNT END) ELSE 0 END) AS AKARYAKIT_TL,
+        SUM(CASE WHEN CL.CODE LIKE '320.02.%' THEN (CASE WHEN CLF.SIGN = 1 THEN CLF.AMOUNT ELSE -CLF.AMOUNT END) ELSE 0 END) AS SIGORTA_TL,
+        SUM(CASE WHEN (CL.CODE LIKE '320.03.%' OR CL.CODE LIKE '320.04.%') THEN (CASE WHEN CLF.SIGN = 1 THEN CLF.AMOUNT ELSE -CLF.AMOUNT END) ELSE 0 END) AS SANAYI_TL,
+        SUM(CASE WHEN (CL.CODE LIKE '320.05.%' OR CL.CODE LIKE '320.06.%') THEN (CASE WHEN CLF.SIGN = 1 THEN CLF.AMOUNT ELSE -CLF.AMOUNT END) ELSE 0 END) AS NAVLUN_TL,
+        SUM(CASE WHEN (CL.CODE LIKE '320.01.%') AND CLF.TRCURR = 1 THEN (CASE WHEN CLF.SIGN = 1 THEN CLF.TRNET ELSE -CLF.TRNET END) ELSE 0 END) AS AKARYAKIT_USD,
+        SUM(CASE WHEN (CL.CODE LIKE '320.02.%') AND CLF.TRCURR = 1 THEN (CASE WHEN CLF.SIGN = 1 THEN CLF.TRNET ELSE -CLF.TRNET END) ELSE 0 END) AS SIGORTA_USD,
+        SUM(CASE WHEN (CL.CODE LIKE '320.03.%' OR CL.CODE LIKE '320.04.%') AND CLF.TRCURR = 1 THEN (CASE WHEN CLF.SIGN = 1 THEN CLF.TRNET ELSE -CLF.TRNET END) ELSE 0 END) AS SANAYI_USD,
+        SUM(CASE WHEN (CL.CODE LIKE '320.05.%' OR CL.CODE LIKE '320.06.%') AND CLF.TRCURR = 1 THEN (CASE WHEN CLF.SIGN = 1 THEN CLF.TRNET ELSE -CLF.TRNET END) ELSE 0 END) AS NAVLUN_USD,
+        SUM(CASE WHEN (CL.CODE LIKE '320.01.%') AND CLF.TRCURR = 20 THEN (CASE WHEN CLF.SIGN = 1 THEN CLF.TRNET ELSE -CLF.TRNET END) ELSE 0 END) AS AKARYAKIT_EUR,
+        SUM(CASE WHEN (CL.CODE LIKE '320.02.%') AND CLF.TRCURR = 20 THEN (CASE WHEN CLF.SIGN = 1 THEN CLF.TRNET ELSE -CLF.TRNET END) ELSE 0 END) AS SIGORTA_EUR,
+        SUM(CASE WHEN (CL.CODE LIKE '320.03.%' OR CL.CODE LIKE '320.04.%') AND CLF.TRCURR = 20 THEN (CASE WHEN CLF.SIGN = 1 THEN CLF.TRNET ELSE -CLF.TRNET END) ELSE 0 END) AS SANAYI_EUR,
+        SUM(CASE WHEN (CL.CODE LIKE '320.05.%' OR CL.CODE LIKE '320.06.%') AND CLF.TRCURR = 20 THEN (CASE WHEN CLF.SIGN = 1 THEN CLF.TRNET ELSE -CLF.TRNET END) ELSE 0 END) AS NAVLUN_EUR
+    FROM LG_{Firma_Bridge}_CLCARD CL WITH(NOLOCK)
+    INNER JOIN LG_{Firma_Bridge}_{Donem_Bridge}_CLFLINE CLF WITH(NOLOCK) ON CLF.CLIENTREF = CL.LOGICALREF
+    WHERE CLF.CANCELLED = 0 AND CL.ACTIVE = 0 AND (
+        CL.CODE LIKE '320.01.%' OR CL.CODE LIKE '320.02.%' OR CL.CODE LIKE '320.03.%' OR
+        CL.CODE LIKE '320.04.%' OR CL.CODE LIKE '320.05.%' OR CL.CODE LIKE '320.06.%')
+    """
+    empty_val = {'TL': 0.0, 'USD': 0.0, 'EUR': 0.0}
+    try:
+        engine = get_engine(1)
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        if not df.empty:
+            r = df.iloc[0]
+            return jsonify({
+                'akaryakit': {'TL': float(r['AKARYAKIT_TL'] or 0.0), 'USD': float(r['AKARYAKIT_USD'] or 0.0), 'EUR': float(r['AKARYAKIT_EUR'] or 0.0)},
+                'sigorta':   {'TL': float(r['SIGORTA_TL'] or 0.0),   'USD': float(r['SIGORTA_USD'] or 0.0),   'EUR': float(r['SIGORTA_EUR'] or 0.0)},
+                'sanayi':    {'TL': float(r['SANAYI_TL'] or 0.0),    'USD': float(r['SANAYI_USD'] or 0.0),    'EUR': float(r['SANAYI_EUR'] or 0.0)},
+                'navlun':    {'TL': float(r['NAVLUN_TL'] or 0.0),    'USD': float(r['NAVLUN_USD'] or 0.0),    'EUR': float(r['NAVLUN_EUR'] or 0.0)}
+            })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    return jsonify({'akaryakit': empty_val, 'sigorta': empty_val, 'sanayi': empty_val, 'navlun': empty_val})
+
+@app.route('/bridge/nakit/virman')
+def bridge_nakit_virman():
+    key = request.headers.get('X-Bridge-Key') or request.args.get('key', '')
+    if key != BRIDGE_KEY:
+        return jsonify({'error': 'Yetkisiz erişim'}), 401
+    target_date = request.args.get('date', pd.Timestamp.now().strftime('%Y-%m-%d'))
+    query = f"""
+    SELECT BNFLINE.LOGICALREF, BNFLINE.SOURCEFREF, BNFICHE.FICHENO,
+        CONVERT(VARCHAR(10), BNFLINE.DATE_, 23) AS TARIH, BNFLINE.SIGN,
+        BNFLINE.AMOUNT AS TL_TUTAR, BNFLINE.TRNET AS DOVIZLI_TUTAR,
+        CASE BANKACC.CURRENCY WHEN 0 THEN 'TL' WHEN 1 THEN 'USD' WHEN 20 THEN 'EUR' ELSE ISNULL(L_CURRENCYLIST.CURCODE, '') END AS HESAP_DOVIZI_RAPOR,
+        BANKACC.DEFINITION_ AS HESAP_ACIKLAMASI, BANKACC.CODE AS HESAP_KODU, BANKACC.ACCOUNTNO AS HESAP_NO,
+        BNFLINE.LINEEXP AS SATIR_ACIKLAMASI,
+        ISNULL(BNFICHE.GENEXP1, '') +' '+ ISNULL(BNFICHE.GENEXP2, '') AS FIS_ACIKLAMASI
+    FROM LG_{Firma_Bridge}_{Donem_Bridge}_BNFLINE BNFLINE WITH(NOLOCK)
+    LEFT JOIN LG_{Firma_Bridge}_{Donem_Bridge}_BNFICHE BNFICHE WITH(NOLOCK) ON BNFICHE.LOGICALREF = BNFLINE.SOURCEFREF
+    LEFT JOIN LG_{Firma_Bridge}_BANKACC BANKACC WITH(NOLOCK) ON BANKACC.LOGICALREF = BNFLINE.BNACCREF
+    LEFT OUTER JOIN L_CURRENCYLIST WITH(NOLOCK) ON L_CURRENCYLIST.CURTYPE = BANKACC.CURRENCY
+    WHERE BNFLINE.MODULENR = 7 AND BNFLINE.TRCODE = 2
+      AND NOT (BANKACC.CODE LIKE '50.%' OR BANKACC.CARDTYPE IN (5, 6))
+      AND CONVERT(VARCHAR, BNFLINE.DATE_, 23) = '{target_date}'
+    ORDER BY BNFLINE.SOURCEFREF, BNFLINE.SIGN
+    """
+    try:
+        engine = get_engine(1)
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return jsonify({'rows': df_to_json_safe_app(df)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/bridge/nakit/incoming')
+def bridge_nakit_incoming():
+    key = request.headers.get('X-Bridge-Key') or request.args.get('key', '')
+    if key != BRIDGE_KEY:
+        return jsonify({'error': 'Yetkisiz erişim'}), 401
+    target_date = request.args.get('date', pd.Timestamp.now().strftime('%Y-%m-%d'))
+    filter_virman = request.args.get('filter_virman', 'false').lower() == 'true'
+    
+    virman_bank_filter = "AND BNFLINE.TRCODE NOT IN (2)" if filter_virman else ""
+    virman_kasa_filter = "AND K.TRCODE NOT IN (61, 62, 63)" if filter_virman else ""
+    query = f"""
+    SELECT DISTINCT BNFLINE.LOGICALREF,
+        CASE BANKACC.CARDTYPE WHEN 1 THEN 'Banka Ticari' WHEN 2 THEN 'Banka Kredi'
+            WHEN 3 THEN 'Banka Dövizli Ticari' WHEN 4 THEN 'Banka Dövizli Kredi'
+            WHEN 5 THEN 'Banka Kredi Kartı' WHEN 6 THEN 'Banka Dövizli Kredi Kartı' ELSE 'Banka' END AS HESAP_TURU_RAPOR,
+        BANKACC.CODE AS HESAP_KODU, BANKACC.DEFINITION_ AS HESAP_ACIKLAMASI,
+        BANKACC.ACCOUNTNO AS HESAP_NO,
+        CASE BANKACC.CURRENCY WHEN 0 THEN 'TL' WHEN 1 THEN 'USD' WHEN 20 THEN 'EUR' ELSE ISNULL(L_CURRENCYLIST.CURCODE, '') END AS HESAP_DOVIZI_RAPOR,
+        BNFICHE.FICHENO, CONVERT(VARCHAR(10), BNFLINE.DATE_, 23) AS TARIH,
+        BNFLINE.LINEEXP AS SATIR_ACIKLAMASI,
+        ISNULL(BNFICHE.GENEXP1, '') +' '+ ISNULL(BNFICHE.GENEXP2, '') +' '+ ISNULL(BNFICHE.GENEXP3, '') +' '+ ISNULL(BNFICHE.GENEXP4, '') AS FIS_ACIKLAMASI,
+        ISNULL((CASE BNFLINE.SIGN WHEN 0 THEN BNFLINE.TRNET ELSE BNFLINE.TRNET * (-1) END),0) AS DOVIZLI_TUTAR,
+        ISNULL((CASE BNFLINE.SIGN WHEN 0 THEN BNFLINE.AMOUNT ELSE BNFLINE.AMOUNT * (-1) END),0) AS TL_TUTAR,
+        CL.CODE AS CARI_KOD, CL.DEFINITION_ AS CARI_UNVAN,
+        CASE WHEN BANKACC.CODE LIKE '50.%' OR BANKACC.CARDTYPE IN (5, 6) THEN
+                CASE BNFLINE.TRCODE WHEN 1 THEN 'Kredi Kartı Harcaması' WHEN 2 THEN 'Kredi Kartı Ödemesi' ELSE 'Kredi Kartı İşlemi' END
+             ELSE ISNULL([dbo].[fn_trcode] ('Bnfiche', BNFLINE.TRCODE, '', ''), 'Banka İşlemi') END AS FIS_TURU
+    FROM LG_{Firma_Bridge}_{Donem_Bridge}_BNFLINE BNFLINE WITH(NOLOCK)
+    LEFT OUTER JOIN LG_{Firma_Bridge}_{Donem_Bridge}_BNFICHE BNFICHE WITH(NOLOCK) ON BNFICHE.LOGICALREF=BNFLINE.SOURCEFREF AND BNFLINE.MODULENR=7 AND BNFLINE.TRCODE=BNFICHE.TRCODE
+    LEFT OUTER JOIN LG_{Firma_Bridge}_BANKACC BANKACC WITH(NOLOCK) ON BNFLINE.BNACCREF=BANKACC.LOGICALREF
+    LEFT JOIN LG_{Firma_Bridge}_CLCARD CL WITH(NOLOCK) ON BNFLINE.CLIENTREF=CL.LOGICALREF
+    LEFT OUTER JOIN L_CURRENCYLIST WITH(NOLOCK) ON L_CURRENCYLIST.CURTYPE=BANKACC.CURRENCY
+    WHERE BNFLINE.SIGN = 0 AND NOT (BANKACC.CODE LIKE '50.%' OR BANKACC.CARDTYPE IN (5, 6))
+      {virman_bank_filter} AND CONVERT(VARCHAR, BNFLINE.DATE_, 23) = '{target_date}'
+    UNION ALL
+    SELECT K.LOGICALREF, 'Kasa' AS HESAP_TURU_RAPOR, KS.CODE AS HESAP_KODU, KS.NAME AS HESAP_ACIKLAMASI,
+        'Kasa' AS HESAP_NO,
+        CASE K.TRCURR WHEN 0 THEN 'TL' WHEN 1 THEN 'USD' WHEN 20 THEN 'EUR' ELSE ISNULL(L_CURRENCYLIST.CURCODE, '') END AS HESAP_DOVIZI_RAPOR,
+        K.FICHENO, CONVERT(VARCHAR(10), K.DATE_, 23) AS TARIH, K.LINEEXP AS SATIR_ACIKLAMASI, '' AS FIS_ACIKLAMASI,
+        ISNULL(K.TRNET, 0) AS DOVIZLI_TUTAR, ISNULL(K.AMOUNT, 0) AS TL_TUTAR,
+        CL.CODE AS CARI_KOD, ISNULL(NULLIF(CL.DEFINITION_, ''), ISNULL(NULLIF(K.CUSTTITLE, ''), '')) AS CARI_UNVAN,
+        [dbo].[fn_trcode] ('Kslines', K.TRCODE, '', '') AS FIS_TURU
+    FROM LG_{Firma_Bridge}_{Donem_Bridge}_KSLINES K WITH(NOLOCK)
+    LEFT JOIN LG_{Firma_Bridge}_KSCARD KS WITH(NOLOCK) ON KS.LOGICALREF = K.CARDREF
+    LEFT JOIN LG_{Firma_Bridge}_CLCARD CL WITH(NOLOCK) ON K.VCARDREF = CL.LOGICALREF
+    LEFT OUTER JOIN L_CURRENCYLIST WITH(NOLOCK) ON L_CURRENCYLIST.CURTYPE = K.TRCURR
+    WHERE K.SIGN = 0 AND K.CANCELLED = 0 {virman_kasa_filter} AND CONVERT(VARCHAR, K.DATE_, 23) = '{target_date}'
+    ORDER BY LOGICALREF
+    """
+    try:
+        engine = get_engine(1)
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return jsonify({'rows': df_to_json_safe_app(df)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/bridge/nakit/outgoing')
+def bridge_nakit_outgoing():
+    key = request.headers.get('X-Bridge-Key') or request.args.get('key', '')
+    if key != BRIDGE_KEY:
+        return jsonify({'error': 'Yetkisiz erişim'}), 401
+    target_date = request.args.get('date', pd.Timestamp.now().strftime('%Y-%m-%d'))
+    filter_virman = request.args.get('filter_virman', 'false').lower() == 'true'
+    
+    virman_bank_filter = "AND BNFLINE.TRCODE NOT IN (2)" if filter_virman else ""
+    virman_kasa_filter = "AND K.TRCODE NOT IN (61, 62, 63)" if filter_virman else ""
+    query = f"""
+    SELECT DISTINCT BNFLINE.LOGICALREF,
+        CASE BANKACC.CARDTYPE WHEN 1 THEN 'Banka Ticari' WHEN 2 THEN 'Banka Kredi'
+            WHEN 3 THEN 'Banka Dövizli Ticari' WHEN 4 THEN 'Banka Dövizli Kredi'
+            WHEN 5 THEN 'Banka Kredi Kartı' WHEN 6 THEN 'Banka Dövizli Kredi Kartı' ELSE 'Banka' END AS HESAP_TURU_RAPOR,
+        BANKACC.CODE AS HESAP_KODU, BANKACC.DEFINITION_ AS HESAP_ACIKLAMASI,
+        BANKACC.ACCOUNTNO AS HESAP_NO,
+        CASE BANKACC.CURRENCY WHEN 0 THEN 'TL' WHEN 1 THEN 'USD' WHEN 20 THEN 'EUR' ELSE ISNULL(L_CURRENCYLIST.CURCODE, '') END AS HESAP_DOVIZI_RAPOR,
+        BNFICHE.FICHENO, CONVERT(VARCHAR(10), BNFLINE.DATE_, 23) AS TARIH,
+        BNFLINE.LINEEXP AS SATIR_ACIKLAMASI,
+        ISNULL(BNFICHE.GENEXP1, '') +' '+ ISNULL(BNFICHE.GENEXP2, '') +' '+ ISNULL(BNFICHE.GENEXP3, '') +' '+ ISNULL(BNFICHE.GENEXP4, '') AS FIS_ACIKLAMASI,
+        ISNULL((CASE BNFLINE.SIGN WHEN 0 THEN BNFLINE.TRNET ELSE BNFLINE.TRNET * (-1) END),0) AS DOVIZLI_TUTAR,
+        ISNULL((CASE BNFLINE.SIGN WHEN 0 THEN BNFLINE.AMOUNT ELSE BNFLINE.AMOUNT * (-1) END),0) AS TL_TUTAR,
+        CL.CODE AS CARI_KOD, CL.DEFINITION_ AS CARI_UNVAN,
+        CASE WHEN BANKACC.CODE LIKE '50.%' OR BANKACC.CARDTYPE IN (5, 6) THEN
+                CASE BNFLINE.TRCODE WHEN 1 THEN 'Kredi Kartı Harcaması' WHEN 2 THEN 'Kredi Kartı Ödemesi' ELSE 'Kredi Kartı İşlemi' END
+             ELSE ISNULL([dbo].[fn_trcode] ('Bnfiche', BNFLINE.TRCODE, '', ''), 'Banka İşlemi') END AS FIS_TURU
+    FROM LG_{Firma_Bridge}_{Donem_Bridge}_BNFLINE BNFLINE WITH(NOLOCK)
+    LEFT OUTER JOIN LG_{Firma_Bridge}_{Donem_Bridge}_BNFICHE BNFICHE WITH(NOLOCK) ON BNFICHE.LOGICALREF=BNFLINE.SOURCEFREF AND BNFLINE.MODULENR=7 AND BNFLINE.TRCODE=BNFICHE.TRCODE
+    LEFT OUTER JOIN LG_{Firma_Bridge}_BANKACC BANKACC WITH(NOLOCK) ON BNFLINE.BNACCREF=BANKACC.LOGICALREF
+    LEFT JOIN LG_{Firma_Bridge}_CLCARD CL WITH(NOLOCK) ON BNFLINE.CLIENTREF=CL.LOGICALREF
+    LEFT OUTER JOIN L_CURRENCYLIST WITH(NOLOCK) ON L_CURRENCYLIST.CURTYPE=BANKACC.CURRENCY
+    WHERE BNFLINE.SIGN = 1 {virman_bank_filter} AND CONVERT(VARCHAR, BNFLINE.DATE_, 23) = '{target_date}'
+    UNION ALL
+    SELECT K.LOGICALREF, 'Kasa' AS HESAP_TURU_RAPOR, KS.CODE AS HESAP_KODU, KS.NAME AS HESAP_ACIKLAMASI,
+        'Kasa' AS HESAP_NO,
+        CASE K.TRCURR WHEN 0 THEN 'TL' WHEN 1 THEN 'USD' WHEN 20 THEN 'EUR' ELSE ISNULL(L_CURRENCYLIST.CURCODE, '') END AS HESAP_DOVIZI_RAPOR,
+        K.FICHENO, CONVERT(VARCHAR(10), K.DATE_, 23) AS TARIH, K.LINEEXP AS SATIR_ACIKLAMASI, '' AS FIS_ACIKLAMASI,
+        ISNULL(K.TRNET, 0) * (-1) AS DOVIZLI_TUTAR, ISNULL(K.AMOUNT, 0) * (-1) AS TL_TUTAR,
+        CL.CODE AS CARI_KOD, ISNULL(NULLIF(CL.DEFINITION_, ''), ISNULL(NULLIF(K.CUSTTITLE, ''), '')) AS CARI_UNVAN,
+        [dbo].[fn_trcode] ('Kslines', K.TRCODE, '', '') AS FIS_TURU
+    FROM LG_{Firma_Bridge}_{Donem_Bridge}_KSLINES K WITH(NOLOCK)
+    LEFT JOIN LG_{Firma_Bridge}_KSCARD KS WITH(NOLOCK) ON KS.LOGICALREF = K.CARDREF
+    LEFT JOIN LG_{Firma_Bridge}_CLCARD CL WITH(NOLOCK) ON K.VCARDREF = CL.LOGICALREF
+    LEFT OUTER JOIN L_CURRENCYLIST WITH(NOLOCK) ON L_CURRENCYLIST.CURTYPE = K.TRCURR
+    WHERE K.SIGN = 1 AND K.CANCELLED = 0 {virman_kasa_filter} AND CONVERT(VARCHAR, K.DATE_, 23) = '{target_date}'
+    ORDER BY LOGICALREF
+    """
+    try:
+        engine = get_engine(1)
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return jsonify({'rows': df_to_json_safe_app(df)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/bridge/nakit/unbilled')
+def bridge_nakit_unbilled():
+    key = request.headers.get('X-Bridge-Key') or request.args.get('key', '')
+    if key != BRIDGE_KEY:
+        return jsonify({'error': 'Yetkisiz erişim'}), 401
+    query = """
+    WITH LineTotals AS (
+        SELECT SHK.KapAdedi * SHK.KDVsizBirimFiyat AS NetAmount,
+            CASE WHEN KDVDurumu = 'M' THEN 0.0 ELSE SHK.KDVOrani END AS KdvOrani,
+            CASE WHEN SHK.KDVOrani = 16 AND KDVDurumu <> 'M' THEN 0.20 ELSE 0.0 END AS TevkifatOrani,
+            PB.PBAdi AS DovizTipi
+        FROM LojistikERP_UFUK.dbo.DY_STOK_HAREKETLERI SHK 
+        INNER JOIN LojistikERP_UFUK.dbo.DY_FATURALAR FT ON FT.FaturaKodu = SHK.FaturaKodu 
+        INNER JOIN LojistikERP_UFUK.dbo.CH_CARI_HESAPLAR CH ON CH.CariHesapKodu = FT.CariHesapKodu 
+        INNER JOIN LojistikERP_UFUK.dbo.DY_STOKLAR ST ON ST.StokKodu = SHK.StokKodu 
+        LEFT JOIN LojistikERP_UFUK.dbo.V_LO_SEVK SVK ON SVK.SevkKodu = SHK.SevkKodu 
+        LEFT JOIN LojistikERP_UFUK.dbo.V_LO_OPR OPR ON OPR.OprKodu = SVK.OprKodu 
+        INNER JOIN LojistikERP_UFUK.dbo.CH_PARA_BIRIMLERI PB ON PB.PBKodu = SHK.PB 
+        INNER JOIN LojistikERP_UFUK.dbo.CH_ANLIK_DOVIZ_KURLARI AD ON AD.PB = SHK.PB AND AD.StokHareketKodu = SHK.StokHareketKodu 
+        WHERE FT.FaturaTipiKodu = 2 AND CH.CariHesapKodu NOT LIKE '53590' 
+          AND FT.ResmiMi = '1' AND (FT.FaturaNo IS NULL OR FT.FaturaNo = '') AND FT.FaturaTarihi >= '2026-01-01'
+    ),
+    LineCalculations AS (
+        SELECT DovizTipi, NetAmount + (NetAmount * KdvOrani / 100.0) - (NetAmount * KdvOrani / 100.0 * TevkifatOrani) AS LineTotal
+        FROM LineTotals
+    )
+    SELECT DovizTipi, SUM(LineTotal) AS ToplamTutar FROM LineCalculations GROUP BY DovizTipi
+    """
+    totals = {'TL': 0.0, 'USD': 0.0, 'EUR': 0.0}
+    try:
+        engine = get_engine(1)
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        if not df.empty:
+            for _, r in df.iterrows():
+                doviz = r['DovizTipi']
+                if doviz in totals:
+                    totals[doviz] = float(r['ToplamTutar'] or 0.0)
+        return jsonify(totals)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/bridge/nakit/debug')
+def bridge_nakit_debug():
+    key = request.headers.get('X-Bridge-Key') or request.args.get('key', '')
+    if key != BRIDGE_KEY:
+        return jsonify({'error': 'Yetkisiz erişim'}), 401
+    
+    results = {}
+    today = pd.Timestamp.now().strftime('%Y-%m-%d')
+    
+    tests = {
+        'own_checks':       f"SELECT COUNT(*) FROM LG_{Firma_Bridge}_{Donem_Bridge}_CSCARD WHERE DOC IN (3,4) AND CURRSTAT NOT IN (8,6)",
+        'customer_checks':  f"SELECT COUNT(*) FROM LG_{Firma_Bridge}_{Donem_Bridge}_CSCARD WHERE DOC = 1 AND CURRSTAT NOT IN (2,6,8)",
+        'credits':          f"SELECT COUNT(*) FROM LG_{Firma_Bridge}_BNCREPAYTR",
+        'bank_balances':    f"SELECT COUNT(*) FROM LG_{Firma_Bridge}_BANKACC WHERE ACTIVE=0 AND CARDTYPE IN (1,3)",
+        'kasa_balances':    f"SELECT COUNT(*) FROM LG_{Firma_Bridge}_KSCARD WHERE ACTIVE=0",
+        'receivables':      f"SELECT COUNT(*) FROM LG_{Firma_Bridge}_{Donem_Bridge}_CLFLINE WHERE CANCELLED=0",
+        'incoming_bank':    f"SELECT COUNT(*) FROM LG_{Firma_Bridge}_{Donem_Bridge}_BNFLINE WHERE SIGN=0 AND CONVERT(VARCHAR,DATE_,23)='{today}'",
+        'fn_trcode_exists': "SELECT COUNT(*) FROM sys.objects WHERE type='FN' AND name='fn_trcode'",
+        'db_name':          "SELECT DB_NAME()",
+    }
+    
+    try:
+        engine = get_engine(1)
+        with engine.connect() as conn:
+            for test_name, query in tests.items():
+                try:
+                    result = conn.execute(text(query)).fetchone()
+                    results[test_name] = str(result[0]) if result else 'NULL'
+                except Exception as e:
+                    results[test_name] = f'HATA: {str(e)}'
+    except Exception as e:
+        return jsonify({'connection_error': str(e)}), 500
+    
+    return jsonify({'firma': Firma_Bridge, 'donem': Donem_Bridge, 'test_date': today, 'results': results})
+
 if __name__ == '__main__':
     app.run(debug=True)
