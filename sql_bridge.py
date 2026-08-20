@@ -58,6 +58,57 @@ def verify_key():
 def health():
     return jsonify({'status': 'ok', 'service': 'SQL Bridge API'})
 
+@bridge_app.route('/bridge/test-connection', methods=['POST'])
+def test_connection():
+    if not verify_key():
+        return jsonify({'error': 'Yetkisiz erişim'}), 401
+    import time
+    conn_data = request.get_json() or {}
+    try:
+        driver = conn_data.get('driver', 'ODBC Driver 17 for SQL Server')
+        server = conn_data.get('server', '').strip()
+        port = conn_data.get('port', '').strip()
+        database = conn_data.get('database', '').strip()
+        username = conn_data.get('username', '').strip()
+        password = conn_data.get('password', '')
+        trusted_conn = conn_data.get('trusted_connection', False)
+        trust_cert = conn_data.get('trust_server_certificate', True)
+        timeout = int(conn_data.get('timeout', 5))
+
+        if not server or not database:
+            return jsonify({'success': False, 'message': 'Sunucu veya veritabanı boş bırakılamaz.'}), 400
+
+        server_part = f"{server},{port}" if port and str(port).strip() != "1433" else server
+        parts = [f"DRIVER={{{driver}}}", f"SERVER={server_part}", f"DATABASE={database}"]
+        if trusted_conn:
+            parts.append("Trusted_Connection=yes")
+        else:
+            if username: parts.append(f"UID={username}")
+            if password: parts.append(f"PWD={password}")
+        if trust_cert:
+            parts.append("TrustServerCertificate=yes")
+        
+        encoded = urllib.parse.quote_plus(";".join(parts) + ";")
+        uri = f"mssql+pyodbc:///?odbc_connect={encoded}"
+        
+        start_time = time.time()
+        engine = create_engine(uri, connect_args={"timeout": timeout})
+        with engine.connect() as conn:
+            result = conn.execute(text("SELECT @@VERSION AS ver, DB_NAME() AS dbname")).fetchone()
+            version_info = result[0].split('\n')[0] if result and result[0] else 'Bilinmiyor'
+            current_db = result[1] if result and len(result) > 1 else database
+
+        elapsed_ms = round((time.time() - start_time) * 1000)
+        return jsonify({
+            'success': True,
+            'message': f"Bağlantı başarılı! ({elapsed_ms} ms)",
+            'version': version_info,
+            'database': current_db,
+            'latency_ms': elapsed_ms
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': f"Bağlantı hatası: {str(e)}"})
+
 @bridge_app.route('/bridge/cariler')
 def bridge_cariler():
     if not verify_key():

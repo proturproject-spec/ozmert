@@ -76,7 +76,10 @@ def inject_user():
 
 @app.before_request
 def require_login():
-    # İzin verilen açık rotalar
+    # İzin verilen açık rotalar ve köprü istekleri (Köprü istekleri kendi API anahtarıyla doğrulanır)
+    if request.path.startswith('/bridge/'):
+        return None
+
     allowed_endpoints = ['login', 'static']
     if request.endpoint and (request.endpoint in allowed_endpoints or request.endpoint.startswith('static')):
         return None
@@ -526,13 +529,8 @@ def save_connections_api():
     except Exception as e:
         return jsonify({'success': False, 'message': f'Hata oluştu: {str(e)}'}), 500
 
-@app.route('/api/db-connections/test', methods=['POST'])
-def test_connection_api():
+def perform_sql_test(conn_data):
     try:
-        conn_data = request.get_json()
-        if not conn_data:
-            return jsonify({'success': False, 'message': 'Bağlantı bilgisi bulunamadı.'}), 400
-        
         driver = conn_data.get('driver', 'SQL Server')
         server = conn_data.get('server', '').strip()
         port = conn_data.get('port', '').strip()
@@ -581,6 +579,38 @@ def test_connection_api():
             'message': f"Bağlantı hatası: {err_msg}"
         })
 
+@app.route('/api/db-connections/test', methods=['POST'])
+def test_connection_api():
+    conn_data = request.get_json()
+    if not conn_data:
+        return jsonify({'success': False, 'message': 'Bağlantı bilgisi bulunamadı.'}), 400
+    
+    # Canlı ortamda (Render) BRIDGE_URL tanımlıysa testi lokal köprü üzerinden yap
+    if USE_BRIDGE:
+        try:
+            resp = http_requests.post(
+                f"{BRIDGE_URL}/bridge/test-connection",
+                json=conn_data,
+                headers={'X-Bridge-Key': BRIDGE_KEY},
+                timeout=15
+            )
+            return jsonify(resp.json())
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': f"Lokal SQL Köprüsüne (Bridge) ulaşılamadı: {str(e)}. Bilgisayarınızda baslat.bat dosyasının açık olduğundan ve Render'daki BRIDGE_URL adresinin güncel olduğundan emin olun."
+            })
+    
+    # Eğer Render ortamındaysa ve BRIDGE_URL tanımlı DEĞİLSE
+    if os.environ.get('RENDER') or os.environ.get('DYNO'):
+        return jsonify({
+            'success': False,
+            'message': "Canlı bulut sunucusunda (Render) yerel ağdaki 'UFUK-SERVER' SQL sunucusuna doğrudan erişilemez. Lütfen Render Dashboard -> Environment bölümünden 'BRIDGE_URL' ve 'BRIDGE_API_KEY' tanımlayın ve yerel bilgisayarınızda baslat.bat dosyasını çalıştırın."
+        })
+
+    # Lokal ortamda doğrudan test et
+    return perform_sql_test(conn_data)
+
 
 # =============================================================
 # SQL KÖPRÜ ENDPOINTLERİ (Lokal bilgisayarda çalışır, Render buna bağlanır)
@@ -590,6 +620,14 @@ def test_connection_api():
 @app.route('/bridge/health')
 def bridge_health():
     return jsonify({'status': 'ok', 'service': 'SQL Bridge'})
+
+@app.route('/bridge/test-connection', methods=['POST'])
+def bridge_test_connection():
+    key = request.headers.get('X-Bridge-Key') or request.args.get('key', '')
+    if key != BRIDGE_KEY:
+        return jsonify({'error': 'Yetkisiz erişim'}), 401
+    conn_data = request.get_json() or {}
+    return perform_sql_test(conn_data)
 
 @app.route('/bridge/cariler')
 def bridge_cariler():
