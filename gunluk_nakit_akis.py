@@ -29,19 +29,43 @@ def format_currency(value):
     except (ValueError, TypeError):
         return str(value)
 
-# --- SQL BAĞLANTI AYARLARI (db_config.json üzerinden dinamik yüklenir) ---
+# --- SQL BAĞLANTI AYARLARI (lazy loading - import sırasında bağlantı kurulmaz) ---
 from db_manager import get_engine
-try:
-    engine = get_engine(1) # 1. SQL Bağlantısı (Ana Veritabanı)
-except Exception as _e:
-    print(f"Ana Veritabanı (Engine 1) başlatma uyarısı: {_e}")
-    engine = None
+import os
 
-try:
-    engine_nexlog = get_engine(2) # 2. SQL Bağlantısı (Nexlog Veritabanı)
-except Exception as _e:
-    print(f"Nexlog Veritabanı (Engine 2) başlatma uyarısı: {_e}")
-    engine_nexlog = None
+_engine_cache = {}
+
+def _get_engine_lazy(conn_id):
+    """Engine'i ilk kullanımda oluşturur. Render/bridge modunda None döner."""
+    if os.environ.get('BRIDGE_URL', '').strip():
+        return None  # Bridge modu aktif, yerel SQL bağlantısı gereksiz
+    if conn_id not in _engine_cache:
+        try:
+            _engine_cache[conn_id] = get_engine(conn_id)
+        except Exception as _e:
+            print(f"Engine {conn_id} başlatma uyarısı: {_e}")
+            _engine_cache[conn_id] = None
+    return _engine_cache[conn_id]
+
+# Geriye dönük uyumluluk için property-like erişim
+class _LazyEngine:
+    def __init__(self, conn_id):
+        self._id = conn_id
+    def __bool__(self):
+        return _get_engine_lazy(self._id) is not None
+    def connect(self):
+        e = _get_engine_lazy(self._id)
+        if e is None:
+            raise RuntimeError(f"SQL Engine {self._id} bu ortamda kullanılamaz (Bridge modu aktif).")
+        return e.connect()
+    def begin(self):
+        e = _get_engine_lazy(self._id)
+        if e is None:
+            raise RuntimeError(f"SQL Engine {self._id} bu ortamda kullanılamaz (Bridge modu aktif).")
+        return e.begin()
+
+engine = _LazyEngine(1)
+engine_nexlog = _LazyEngine(2)
 
 _NEXLOG_CATEGORIES_CACHE = None
 
