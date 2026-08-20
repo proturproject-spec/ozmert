@@ -908,5 +908,39 @@ def bridge_cari_ekstre():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/bridge-status')
+def api_bridge_status():
+    """Render tarafından bridge erişimini test eder."""
+    import os as _os
+    bridge_url = _os.environ.get('BRIDGE_URL', '').rstrip('/')
+    bridge_key = _os.environ.get('BRIDGE_API_KEY', 'nexlog_bridge_2026_secure_xKj9')
+    
+    status = {
+        'bridge_url_configured': bool(bridge_url),
+        'bridge_url': bridge_url or '(ayarlanmamış)',
+        'use_bridge': bool(bridge_url),
+    }
+    
+    if bridge_url:
+        # Health check
+        try:
+            r = http_requests.get(f"{bridge_url}/bridge/health", timeout=10)
+            status['health_check'] = r.json() if r.status_code == 200 else f"HTTP {r.status_code}"
+        except Exception as e:
+            status['health_check'] = f"BAĞLANAMADI: {str(e)}"
+        
+        # Debug check
+        try:
+            r2 = http_requests.get(
+                f"{bridge_url}/bridge/nakit/debug",
+                headers={'X-Bridge-Key': bridge_key},
+                timeout=30
+            )
+            status['nakit_debug'] = r2.json() if r2.status_code == 200 else f"HTTP {r2.status_code}"
+        except Exception as e:
+            status['nakit_debug'] = f"BAĞLANAMADI: {str(e)}"
+    
+    return jsonify(status)
+
 if __name__ == '__main__':
     app.run(debug=True)
