@@ -641,20 +641,21 @@
                 </div>
 
                 <!-- Kullanıcı Tablosu -->
-                <div style="overflow-x: auto; border: 1px solid var(--border-color); border-radius: 0.5rem; background: #0f172a;">
+                <div style="overflow-x: auto; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--card-bg-subtle, #0f172a);">
                     <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.875rem;">
                         <thead>
                             <tr style="background: rgba(255, 255, 255, 0.04); border-bottom: 1px solid var(--border-color); color: var(--text-muted);">
                                 <th style="padding: 0.75rem 1rem;">Kullanıcı Adı</th>
                                 <th style="padding: 0.75rem 1rem;">Ad Soyad / Tanım</th>
                                 <th style="padding: 0.75rem 1rem;">Yetki Rolü</th>
+                                <th style="padding: 0.75rem 1rem;">Erişebildiği Sayfalar (Yetkiler)</th>
                                 <th style="padding: 0.75rem 1rem; text-align: right;">İşlemler</th>
                             </tr>
                         </thead>
                         <tbody id="user-table-body">
                             {% for u in users %}
                             <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.04);">
-                                <td style="padding: 0.75rem 1rem; font-weight: 600; color: #f8fafc;">
+                                <td style="padding: 0.75rem 1rem; font-weight: 700; color: var(--text-main, #f8fafc);">
                                     <div style="display: flex; align-items: center; gap: 0.5rem;">
                                         <span style="font-size: 1.1rem;">👤</span>
                                         <span>{{ u.username }}</span>
@@ -663,7 +664,7 @@
                                         {% endif %}
                                     </div>
                                 </td>
-                                <td style="padding: 0.75rem 1rem; color: var(--text-muted);">{{ u.name }}</td>
+                                <td style="padding: 0.75rem 1rem; color: var(--text-muted); font-weight: 500;">{{ u.name }}</td>
                                 <td style="padding: 0.75rem 1rem;">
                                     {% if u.role == 'admin' %}
                                     <span style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); padding: 0.2rem 0.5rem; border-radius: 9999px; font-weight: 600;">
@@ -675,14 +676,38 @@
                                     </span>
                                     {% endif %}
                                 </td>
+                                <td style="padding: 0.75rem 1rem;">
+                                    {% if u.role == 'admin' or '*' in u.allowed_pages %}
+                                    <span style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: 700;">
+                                        ⭐ Tüm Sayfalara Tam Yetkili
+                                    </span>
+                                    {% else %}
+                                    <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; max-width: 380px;">
+                                        {% for sp in system_pages %}
+                                            {% if sp.key in u.allowed_pages %}
+                                            <span style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.72rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main, #f8fafc); border: 1px solid var(--border-color); padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 600;">
+                                                <span>{{ sp.icon }}</span> <span>{{ sp.title }}</span>
+                                            </span>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </td>
                                 <td style="padding: 0.75rem 1rem; text-align: right;">
-                                    <div style="display: inline-flex; gap: 0.5rem;">
+                                    <div style="display: inline-flex; gap: 0.4rem;">
+                                        <button type="button" class="btn btn-outline" style="padding: 0.35rem 0.65rem; font-size: 0.8rem; color: #60a5fa; border-color: rgba(59, 130, 246, 0.3);" onclick='promptEditPermissions("{{ u.username }}", "{{ u.name }}", "{{ u.role }}", {{ u.allowed_pages|tojson }})'>
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                            </svg>
+                                            Yetkileri Düzenle
+                                        </button>
                                         <button type="button" class="btn btn-outline" style="padding: 0.35rem 0.65rem; font-size: 0.8rem;" onclick="promptResetPassword('{{ u.username }}', '{{ u.name }}')">
                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
                                                 <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                                             </svg>
-                                            Şifre Belirle
+                                            Şifre
                                         </button>
                                         {% if u.username != current_user.username %}
                                         <button type="button" class="btn btn-outline" style="padding: 0.35rem 0.65rem; font-size: 0.8rem; color: #f87171; border-color: rgba(239, 68, 68, 0.3);" onclick="handleDeleteUser('{{ u.username }}')">
@@ -742,11 +767,11 @@
 </div>
 
 <!-- YENİ KULLANICI EKLEME MODALI -->
-<div id="add-user-modal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(4px); z-index: 999; align-items: center; justify-content: center; padding: 1rem;">
-    <div style="background: #1e293b; border: 1px solid var(--border-color); border-radius: 0.75rem; width: 100%; max-width: 460px; padding: 1.75rem; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+<div id="add-user-modal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(5px); z-index: 999; align-items: center; justify-content: center; padding: 1rem; overflow-y: auto;">
+    <div style="background: #1e293b; border: 1px solid var(--border-color); border-radius: 0.85rem; width: 100%; max-width: 520px; padding: 1.75rem; box-shadow: 0 20px 40px rgba(0,0,0,0.6); max-height: 90vh; overflow-y: auto;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
             <h3 style="font-size: 1.2rem; margin: 0; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
-                <span>➕</span> Yeni Kullanıcı ve Şifre Tanımla
+                <span>➕</span> Yeni Kullanıcı & Yetki Tanımla
             </h3>
             <button type="button" onclick="toggleAddUserModal(false)" style="background: none; border: none; color: var(--text-muted); font-size: 1.2rem; cursor: pointer;">✕</button>
         </div>
@@ -754,11 +779,11 @@
         <form id="add-user-form" onsubmit="handleAddUser(event)">
             <div class="form-group">
                 <label class="form-label">Kullanıcı Adı (Giriş İçin) *</label>
-                <input type="text" class="form-control" id="new-user-username" placeholder="örn: muhasebe1, ahmet" required>
+                <input type="text" class="form-control" id="new-user-username" placeholder="örn: deniz, ahmet" required>
             </div>
             <div class="form-group">
                 <label class="form-label">Ad Soyad / Ünvan</label>
-                <input type="text" class="form-control" id="new-user-name" placeholder="örn: Ahmet Yılmaz">
+                <input type="text" class="form-control" id="new-user-name" placeholder="örn: Deniz Keleş">
             </div>
             <div class="form-group">
                 <label class="form-label">Giriş Şifresi *</label>
@@ -768,15 +793,94 @@
             </div>
             <div class="form-group">
                 <label class="form-label">Yetki Rolü</label>
-                <select class="form-control" id="new-user-role">
-                    <option value="user">Standart Kullanıcı (Panel Erişimi)</option>
-                    <option value="admin">Yönetici (Tam Yetkili Admin)</option>
+                <select class="form-control" id="new-user-role" onchange="toggleAddUserRolePermissions(this.value)">
+                    <option value="user" selected>Standart Kullanıcı (Seçilen Sayfalara Erişim)</option>
+                    <option value="admin">Yönetici (Tüm Sayfalara Tam Yetkili)</option>
                 </select>
+            </div>
+
+            <!-- SAYFA ERİŞİM YETKİLERİ -->
+            <div id="add-user-permissions-wrap" style="margin-top: 1.25rem; padding: 1rem; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border-color); border-radius: 0.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                    <label class="form-label" style="margin: 0; font-weight: 700; color: #60a5fa;">🛡️ Erişebileceği Sayfalar:</label>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button type="button" class="btn btn-outline" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="toggleAllCheckboxes('add-user-page-check', true)">Tümünü Seç</button>
+                        <button type="button" class="btn btn-outline" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="toggleAllCheckboxes('add-user-page-check', false)">Temizle</button>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;">
+                    {% for sp in system_pages %}
+                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #f8fafc; cursor: pointer; background: rgba(255,255,255,0.04); padding: 0.4rem 0.6rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                        <input type="checkbox" class="add-user-page-check" value="{{ sp.key }}" {% if sp.key != 'parametreler' %}checked{% endif %}>
+                        <span>{{ sp.icon }} {{ sp.title }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
             </div>
 
             <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem; justify-content: flex-end;">
                 <button type="button" class="btn btn-outline" onclick="toggleAddUserModal(false)">İptal</button>
                 <button type="submit" class="btn btn-primary" id="btn-save-new-user">Kullanıcıyı Kaydet</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- YETKİ VE SAYFA İZİNLERİNİ DÜZENLEME MODALI -->
+<div id="edit-permissions-modal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(5px); z-index: 999; align-items: center; justify-content: center; padding: 1rem; overflow-y: auto;">
+    <div style="background: #1e293b; border: 1px solid var(--border-color); border-radius: 0.85rem; width: 100%; max-width: 520px; padding: 1.75rem; box-shadow: 0 20px 40px rgba(0,0,0,0.6); max-height: 90vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+            <h3 style="font-size: 1.2rem; margin: 0; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
+                <span>🛡️</span> Yetkileri ve Sayfa İzinlerini Düzenle
+            </h3>
+            <button type="button" onclick="toggleEditPermissionsModal(false)" style="background: none; border: none; color: var(--text-muted); font-size: 1.2rem; cursor: pointer;">✕</button>
+        </div>
+
+        <form id="edit-permissions-form" onsubmit="handleSavePermissions(event)">
+            <input type="hidden" id="edit-user-username">
+
+            <div class="form-group">
+                <label class="form-label">Kullanıcı Adı</label>
+                <input type="text" class="form-control" id="edit-user-username-display" disabled style="opacity: 0.7; cursor: not-allowed;">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Ad Soyad / Ünvan</label>
+                <input type="text" class="form-control" id="edit-user-name" placeholder="Ad Soyad">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Yetki Rolü</label>
+                <select class="form-control" id="edit-user-role" onchange="toggleEditRolePermissions(this.value)">
+                    <option value="user">Standart Kullanıcı (Seçilen Sayfalara Erişim)</option>
+                    <option value="admin">Yönetici (Tüm Sayfalara Tam Yetkili)</option>
+                </select>
+            </div>
+
+            <!-- SAYFA ERİŞİM YETKİLERİ -->
+            <div id="edit-user-permissions-wrap" style="margin-top: 1.25rem; padding: 1rem; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border-color); border-radius: 0.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                    <label class="form-label" style="margin: 0; font-weight: 700; color: #60a5fa;">🛡️ Erişebileceği Sayfalar:</label>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button type="button" class="btn btn-outline" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="toggleAllCheckboxes('edit-user-page-check', true)">Tümünü Seç</button>
+                        <button type="button" class="btn btn-outline" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="toggleAllCheckboxes('edit-user-page-check', false)">Temizle</button>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;">
+                    {% for sp in system_pages %}
+                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #f8fafc; cursor: pointer; background: rgba(255,255,255,0.04); padding: 0.4rem 0.6rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                        <input type="checkbox" class="edit-user-page-check" value="{{ sp.key }}" id="edit-check-{{ sp.key }}">
+                        <span>{{ sp.icon }} {{ sp.title }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem; justify-content: flex-end;">
+                <button type="button" class="btn btn-outline" onclick="toggleEditPermissionsModal(false)">İptal</button>
+                <button type="submit" class="btn btn-primary" id="btn-save-permissions">Yetkileri Kaydet</button>
             </div>
         </form>
     </div>
@@ -1056,13 +1160,48 @@
         }
     }
 
-    // --- YÖNETİCİ KULLANICI & ŞİFRE YÖNETİMİ ---
+    // --- YÖNETİCİ KULLANICI & ŞİFRE & YETKİ YÖNETİMİ ---
+    function toggleAllCheckboxes(className, checked) {
+        document.querySelectorAll(`.${className}`).forEach(cb => {
+            cb.checked = checked;
+        });
+    }
+
+    function toggleAddUserRolePermissions(role) {
+        const wrap = document.getElementById('add-user-permissions-wrap');
+        if (role === 'admin') {
+            toggleAllCheckboxes('add-user-page-check', true);
+            wrap.style.opacity = '0.5';
+            wrap.style.pointerEvents = 'none';
+        } else {
+            wrap.style.opacity = '1';
+            wrap.style.pointerEvents = 'all';
+        }
+    }
+
+    function toggleEditRolePermissions(role) {
+        const wrap = document.getElementById('edit-user-permissions-wrap');
+        if (role === 'admin') {
+            toggleAllCheckboxes('edit-user-page-check', true);
+            wrap.style.opacity = '0.5';
+            wrap.style.pointerEvents = 'none';
+        } else {
+            wrap.style.opacity = '1';
+            wrap.style.pointerEvents = 'all';
+        }
+    }
+
     function toggleAddUserModal(show) {
         const modal = document.getElementById('add-user-modal');
         if (modal) {
             modal.style.display = show ? 'flex' : 'none';
             if (show) {
                 document.getElementById('add-user-form').reset();
+                document.getElementById('new-user-role').value = 'user';
+                toggleAddUserRolePermissions('user');
+                toggleAllCheckboxes('add-user-page-check', true);
+                const paramCheck = document.querySelector('.add-user-page-check[value="parametreler"]');
+                if (paramCheck) paramCheck.checked = false;
                 document.getElementById('new-user-username').focus();
             }
         }
@@ -1076,6 +1215,15 @@
         const role = document.getElementById('new-user-role').value;
         const btn = document.getElementById('btn-save-new-user');
 
+        const allowed_pages = [];
+        if (role === 'admin') {
+            allowed_pages.push('*');
+        } else {
+            document.querySelectorAll('.add-user-page-check:checked').forEach(cb => {
+                allowed_pages.push(cb.value);
+            });
+        }
+
         btn.disabled = true;
         btn.innerText = 'Kaydediliyor...';
 
@@ -1083,7 +1231,7 @@
             const response = await fetch('/api/users/add', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, name, password, role })
+                body: JSON.stringify({ username, name, password, role, allowed_pages })
             });
 
             const data = await response.json();
@@ -1099,6 +1247,75 @@
         } finally {
             btn.disabled = false;
             btn.innerText = 'Kullanıcıyı Kaydet';
+        }
+    }
+
+    function promptEditPermissions(username, name, role, allowedPages) {
+        document.getElementById('edit-user-username').value = username;
+        document.getElementById('edit-user-username-display').value = username;
+        document.getElementById('edit-user-name').value = name || username;
+        document.getElementById('edit-user-role').value = role || 'user';
+
+        // Checkboxes
+        const isAll = role === 'admin' || (Array.isArray(allowedPages) && allowedPages.includes('*'));
+        document.querySelectorAll('.edit-user-page-check').forEach(cb => {
+            if (isAll) {
+                cb.checked = true;
+            } else {
+                cb.checked = Array.isArray(allowedPages) && allowedPages.includes(cb.value);
+            }
+        });
+
+        toggleEditRolePermissions(role);
+        toggleEditPermissionsModal(true);
+    }
+
+    function toggleEditPermissionsModal(show) {
+        const modal = document.getElementById('edit-permissions-modal');
+        if (modal) {
+            modal.style.display = show ? 'flex' : 'none';
+        }
+    }
+
+    async function handleSavePermissions(e) {
+        e.preventDefault();
+        const username = document.getElementById('edit-user-username').value;
+        const name = document.getElementById('edit-user-name').value.trim();
+        const role = document.getElementById('edit-user-role').value;
+        const btn = document.getElementById('btn-save-permissions');
+
+        const allowed_pages = [];
+        if (role === 'admin') {
+            allowed_pages.push('*');
+        } else {
+            document.querySelectorAll('.edit-user-page-check:checked').forEach(cb => {
+                allowed_pages.push(cb.value);
+            });
+        }
+
+        btn.disabled = true;
+        btn.innerText = 'Kaydediliyor...';
+
+        try {
+            const response = await fetch('/api/users/edit-permissions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, name, role, allowed_pages })
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                showToast(data.message, 'success');
+                toggleEditPermissionsModal(false);
+                setTimeout(() => window.location.reload(), 800);
+            } else {
+                showToast(data.message, 'error');
+            }
+        } catch (err) {
+            showToast('Yetkiler kaydedilirken hata oluştu.', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerText = 'Yetkileri Kaydet';
         }
     }
 

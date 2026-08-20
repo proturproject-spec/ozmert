@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Erişim Yetkisi Yok — Finans Paneli{% endblock %}
+
+{% block content %}
+<div style="max-width: 600px; margin: 4rem auto; text-align: center; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius, 12px); padding: 3rem 2rem; box-shadow: 0 10px 30px var(--shadow-color);">
+    <div style="font-size: 3.5rem; margin-bottom: 1rem;">🚫</div>
+    <h1 style="font-size: 1.6rem; font-weight: 800; color: var(--text-main); margin-bottom: 0.75rem;">Bu Sayfaya Erişim Yetkiniz Bulunmamaktadır</h1>
+    <p style="font-size: 0.95rem; color: var(--text-muted); line-height: 1.6; margin-bottom: 2rem;">
+        Giriş yaptığınız kullanıcı hesabı (<strong>{{ current_user.name or current_user.username }}</strong>) bu modüle veya sayfaya erişim için yetkilendirilmemiştir.
+        Erişim izni için lütfen sistem yöneticiniz ile iletişime geçiniz.
+    </p>
+    <div style="display: flex; justify-content: center; gap: 1rem;">
+        <a href="/" style="display: inline-flex; align-items: center; gap: 0.5rem; background: var(--accent); color: #ffffff; padding: 0.65rem 1.5rem; border-radius: 8px; font-weight: 700; text-decoration: none; transition: all 0.2s ease;">
+            <span>🏠 Ana Sayfaya Dön</span>
+        </a>
+    </div>
+</div>
+{% endblock %}

@@ -3,6 +3,23 @@
     "username": "yokus",
     "password_hash": "scrypt:32768:8:1$HmF564LNnTr3h9dE$c53443a847c07445ca29cad02868c7c70f56888f4882cdf53a378c0dc9e5e119622a93032aed456190948a36dd424357d15a41cc388f554c45beea5ae1a7a31c",
     "name": "Ali Yokuş (Yönetici)",
-    "role": "admin"
+    "role": "admin",
+    "allowed_pages": [
+      "*"
+    ]
+  },
+  {
+    "username": "deniz",
+    "name": "Keleş",
+    "password_hash": "scrypt:32768:8:1$WWNVYtPYSsiffOtT$694db9457a11553cc1d2883a05827f20a77890c4b2c8543fc458bc49f2ef3b9ac098d399c4923acc69c87f6a008fa884eb404bb07cf8990fffb828b1f3d34b34",
+    "role": "user",
+    "allowed_pages": [
+      "index",
+      "muhasebe",
+      "cari_ekstre",
+      "cari_kapama",
+      "finans",
+      "raporlar"
+    ]
   }
 ]

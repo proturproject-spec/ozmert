@@ -1,10 +1,418 @@
 {% extends "base.html" %}
 
-{% block title %}Ana Sayfa - Yönetim Paneli{% endblock %}
+{% block title %}Ana Sayfa - Finans & Muhasebe Yönetim Paneli{% endblock %}
 
 {% block content %}
-<div class="card">
-    <h1>Ana Sayfa</h1>
-    <p>Finans ve muhasebe yönetim paneline hoş geldiniz. Menüden işlem yapmak istediğiniz modülü seçebilirsiniz.</p>
+<style>
+    .home-container {
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+        width: 100%;
+    }
+
+    /* Hero Banner */
+    .hero-banner {
+        background: linear-gradient(135deg, var(--card-bg), var(--card-bg-subtle));
+        border: 1px solid var(--border-color);
+        border-radius: 1rem;
+        padding: 2.25rem 2.5rem;
+        box-shadow: 0 15px 35px -5px var(--shadow-color);
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1.5rem;
+    }
+
+    .hero-banner::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -10%;
+        width: 300px;
+        height: 300px;
+        background: radial-gradient(circle, var(--accent-light) 0%, transparent 70%);
+        border-radius: 50%;
+        pointer-events: none;
+    }
+
+    .hero-content h1 {
+        font-size: 2rem;
+        font-weight: 800;
+        color: var(--text-main);
+        margin-bottom: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .hero-subtitle {
+        color: var(--text-muted);
+        font-size: 1rem;
+        max-width: 600px;
+        line-height: 1.5;
+    }
+
+    .hero-status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: var(--accent-light);
+        color: var(--accent);
+        padding: 0.4rem 0.9rem;
+        border-radius: 2rem;
+        font-size: 0.85rem;
+        font-weight: 700;
+        border: 1px solid var(--border-color);
+        margin-top: 0.75rem;
+    }
+
+    .hero-meta {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.5rem;
+        text-align: right;
+    }
+
+    .clock-display {
+        font-size: 1.75rem;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+        color: var(--accent);
+        letter-spacing: -0.02em;
+    }
+
+    .date-display {
+        font-size: 0.875rem;
+        color: var(--text-muted);
+        font-weight: 500;
+    }
+
+    /* Section Başlıkları */
+    .section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1.25rem;
+    }
+
+    .section-title {
+        font-size: 1.35rem;
+        font-weight: 800;
+        color: var(--text-main);
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+    }
+
+    .section-desc {
+        color: var(--text-muted);
+        font-size: 0.875rem;
+    }
+
+    /* --- HIZLI ERİŞİM MODÜL KARTLARI --- */
+    .modules-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1.25rem;
+    }
+
+    .module-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 0.85rem;
+        padding: 1.5rem;
+        text-decoration: none;
+        color: var(--text-main);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        transition: all 0.25s ease;
+        box-shadow: 0 4px 12px var(--shadow-color);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .module-card:hover {
+        transform: translateY(-4px);
+        border-color: var(--accent);
+        box-shadow: 0 12px 28px -6px var(--shadow-color);
+    }
+
+    .module-icon-wrap {
+        width: 48px;
+        height: 48px;
+        border-radius: 0.75rem;
+        background: var(--accent-light);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+        border: 1px solid var(--border-color);
+    }
+
+    .module-title {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--text-main);
+        margin-bottom: 0.4rem;
+    }
+
+    .module-desc {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        line-height: 1.4;
+        margin-bottom: 1.25rem;
+    }
+
+    .module-footer {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        color: var(--accent);
+        font-size: 0.85rem;
+        font-weight: 700;
+        margin-top: auto;
+    }
+
+    .module-card:hover .module-footer svg {
+        transform: translateX(4px);
+    }
+
+    .module-footer svg {
+        transition: transform 0.2s ease;
+    }
+
+    /* Güvenlik & Sistem Özellikleri Paneli */
+    .system-info-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 0.85rem;
+        padding: 1.5rem 2rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1.5rem;
+    }
+
+    .info-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .info-icon {
+        font-size: 1.75rem;
+    }
+
+    .info-text-title {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: var(--text-main);
+    }
+
+    .info-text-desc {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+</style>
+
+<div class="home-container">
+    <!-- Hero Banner -->
+    <div class="hero-banner">
+        <div class="hero-content">
+            <h1 id="greetingText">⚡ Hoş Geldiniz</h1>
+            <p class="hero-subtitle">
+                Nexlog Finans ve Muhasebe Yönetim Paneli. Raporlama, cari hesap hareketleri, borç/alacak eşleştirme ve SQL veri köprüsü kontrollerinizi bu merkezden yönetebilirsiniz.
+            </p>
+            <div class="hero-status-pill">
+                <span>🟢</span>
+                <span>Sistem Çevrimiçi & Aktif</span>
+            </div>
+        </div>
+
+        <div class="hero-meta">
+            <div class="clock-display" id="liveClock">--:--:--</div>
+            <div class="date-display" id="liveDate">Tarih yükleniyor...</div>
+        </div>
+    </div>
+
+    <!-- 🚀 HIZLI ERİŞİM MODÜLLERİ -->
+    <div>
+        <div class="section-header">
+            <div>
+                <h2 class="section-title">🚀 Hızlı Erişim Modülleri</h2>
+                <p class="section-desc">Sık kullanılan muhasebe ve finans araçlarına doğrudan geçiş yapın.</p>
+            </div>
+        </div>
+
+        <div class="modules-grid">
+            {% if has_permission('cari_ekstre') %}
+            <a href="/finans/cari-ekstre" class="module-card">
+                <div>
+                    <div class="module-icon-wrap">📑</div>
+                    <div class="module-title">Cari Hesap Ekstresi</div>
+                    <p class="module-desc">Logo ERP cari kart hareketleri, borç/alacak dökümü, devir bakiyesi ve Excel dışa aktarma.</p>
+                </div>
+                <div class="module-footer">
+                    <span>Ekstreye Git</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                        <polyline points="12 5 19 12 12 19"></polyline>
+                    </svg>
+                </div>
+            </a>
+            {% endif %}
+
+            {% if has_permission('cari_kapama') %}
+            <a href="/finans/cari-kapama" class="module-card">
+                <div>
+                    <div class="module-icon-wrap">🔄</div>
+                    <div class="module-title">Cari Hesap Kapama</div>
+                    <p class="module-desc">Açık faturalar ile tahsilat ve ödeme hareketlerini eşleştirme ve otomatik bakiye kapama.</p>
+                </div>
+                <div class="module-footer">
+                    <span>Kapamaya Git</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                        <polyline points="12 5 19 12 12 19"></polyline>
+                    </svg>
+                </div>
+            </a>
+            {% endif %}
+
+            {% if has_permission('nakit_akis') %}
+            <a href="/finans/nakit-akis" class="module-card">
+                <div>
+                    <div class="module-icon-wrap">💵</div>
+                    <div class="module-title">Nakit Akış Paneli</div>
+                    <p class="module-desc">Günlük banka bakiyeleri, vadesi gelen çekler, kredi ve taksit ödemeleri, kurlar ve nakit akış tahminleri.</p>
+                </div>
+                <div class="module-footer">
+                    <span>Nakit Akışa Git</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                        <polyline points="12 5 19 12 12 19"></polyline>
+                    </svg>
+                </div>
+            </a>
+            {% endif %}
+
+            {% if has_permission('finans') %}
+            <a href="/finans" class="module-card">
+                <div>
+                    <div class="module-icon-wrap">📊</div>
+                    <div class="module-title">Finans Genel Görünüm</div>
+                    <p class="module-desc">Kasa, banka, çek-senet durumları ve genel finansal durum göstergeleri.</p>
+                </div>
+                <div class="module-footer">
+                    <span>Finansa Git</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                        <polyline points="12 5 19 12 12 19"></polyline>
+                    </svg>
+                </div>
+            </a>
+            {% endif %}
+
+            {% if has_permission('muhasebe') %}
+            <a href="/muhasebe" class="module-card">
+                <div>
+                    <div class="module-icon-wrap">📑</div>
+                    <div class="module-title">Muhasebe Modülü</div>
+                    <p class="module-desc">Muhasebe fiş kayıtları, yevmiye dökümleri ve genel mizan hareketleri.</p>
+                </div>
+                <div class="module-footer">
+                    <span>Muhasebeye Git</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                        <polyline points="12 5 19 12 12 19"></polyline>
+                    </svg>
+                </div>
+            </a>
+            {% endif %}
+
+            {% if has_permission('parametreler') %}
+            <a href="/parametreler#baglanti" class="module-card">
+                <div>
+                    <div class="module-icon-wrap">🔌</div>
+                    <div class="module-title">SQL Bağlantı Ayarları</div>
+                    <p class="module-desc">Logo ve Nexlog MS SQL veritabanı bağlantılarını yapılandırın ve canlıda köprü testi yapın.</p>
+                </div>
+                <div class="module-footer">
+                    <span>Ayarları Yönet</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                        <polyline points="12 5 19 12 12 19"></polyline>
+                    </svg>
+                </div>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 🔒 SİSTEM VE GÜVENLİK BİLGİ KARTI -->
+    <div class="system-info-card">
+        <div class="info-item">
+            <span class="info-icon">🛡️</span>
+            <div>
+                <div class="info-text-title">Oturum & Sekme Güvenliği</div>
+                <div class="info-text-desc">Sekme kapandığında veya 5 dk hareketsizlikte otomatik kilitlenir.</div>
+            </div>
+        </div>
+
+        <div class="info-item">
+            <span class="info-icon">🌉</span>
+            <div>
+                <div class="info-text-title">SQL Köprü Desteği (Bridge)</div>
+                <div class="info-text-desc">1433 portunu dışarı açmadan yerel veritabanına şifreli tünel ile bağlanır.</div>
+            </div>
+        </div>
+
+        <div class="info-item">
+            <span class="info-icon">⚡</span>
+            <div>
+                <div class="info-text-title">Çift Yıl Desteği (2025 & 2026)</div>
+                <div class="info-text-desc">Geçmiş ve cari dönem Logo tabloları arasında anında geçiş.</div>
+            </div>
+        </div>
+    </div>
 </div>
+
+<script>
+    // Canlı Saat ve Tarih
+    function updateClock() {
+        const now = new Date();
+        const clockEl = document.getElementById('liveClock');
+        const dateEl = document.getElementById('liveDate');
+        const greetingEl = document.getElementById('greetingText');
+
+        if (clockEl) {
+            clockEl.innerText = now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+
+        if (dateEl) {
+            dateEl.innerText = now.toLocaleDateString('tr-TR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        }
+
+        if (greetingEl) {
+            const hour = now.getHours();
+            let greeting = 'İyi Günler';
+            if (hour >= 5 && hour < 12) greeting = 'Günaydın';
+            else if (hour >= 18 || hour < 5) greeting = 'İyi Akşamlar';
+            
+            const userName = "{{ current_user.name if current_user else 'Kullanıcı' }}";
+            greetingEl.innerHTML = `⚡ ${greeting}, <span style="color: var(--accent);">${userName}</span>`;
+        }
+    }
+
+    setInterval(updateClock, 1000);
+    updateClock();
+</script>
 {% endblock %}

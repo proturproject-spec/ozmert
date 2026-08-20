@@ -65,13 +65,50 @@ def authenticate_user(username, password):
 
 import secrets
 
+ALL_SYSTEM_PAGES = [
+    {'key': 'index', 'title': 'Ana Sayfa', 'icon': '🏠', 'url': '/'},
+    {'key': 'muhasebe', 'title': 'Muhasebe', 'icon': '📑', 'url': '/muhasebe'},
+    {'key': 'cari_ekstre', 'title': 'Cari Hesap Ekstresi', 'icon': '📑', 'url': '/finans/cari-ekstre'},
+    {'key': 'cari_kapama', 'title': 'Cari Hesap Kapama', 'icon': '🔄', 'url': '/finans/cari-kapama'},
+    {'key': 'nakit_akis', 'title': 'Nakit Akış Paneli', 'icon': '💵', 'url': '/finans/nakit-akis'},
+    {'key': 'finans', 'title': 'Finans Genel Görünüm', 'icon': '📊', 'url': '/finans'},
+    {'key': 'raporlar', 'title': 'Raporlar', 'icon': '📈', 'url': '/raporlar'},
+    {'key': 'parametreler', 'title': 'Parametreler & Ayarlar', 'icon': '⚙️', 'url': '/parametreler'}
+]
+
+def user_has_permission(page_key):
+    u = session.get('user')
+    if not u:
+        return False
+    if u.get('role') == 'admin':
+        return True
+    allowed = u.get('allowed_pages')
+    if allowed is None:
+        return page_key != 'parametreler'
+    return page_key in allowed or '*' in allowed
+
+def permission_required(page_key):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not user_has_permission(page_key):
+                if request.is_json or request.path.startswith('/api/') or request.path.startswith('/finans/api/'):
+                    return jsonify({'success': False, 'message': 'Bu işlem için yetkiniz bulunmamaktadır.'}), 403
+                flash('Bu sayfaya erişim yetkiniz bulunmamaktadır.', 'error')
+                return render_template('unauthorized.html', page_key=page_key, aktif_sayfa='unauthorized'), 403
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
 @app.context_processor
 def inject_user():
     is_fresh = session.pop('login_fresh', False)
     return {
         'current_user': session.get('user'),
         'session_tab_token': session.get('tab_token', ''),
-        'is_fresh_login': is_fresh
+        'is_fresh_login': is_fresh,
+        'has_permission': user_has_permission,
+        'ALL_SYSTEM_PAGES': ALL_SYSTEM_PAGES
     }
 
 @app.before_request
@@ -117,7 +154,8 @@ def login():
             session['user'] = {
                 'username': user.get('username'),
                 'name': user.get('name', username),
-                'role': user.get('role', 'user')
+                'role': user.get('role', 'user'),
+                'allowed_pages': user.get('allowed_pages', ['index', 'muhasebe', 'cari_ekstre', 'cari_kapama', 'nakit_akis', 'finans', 'raporlar']) if user.get('role') != 'admin' else ['*']
             }
             session['tab_token'] = secrets.token_hex(16)
             session['login_fresh'] = True
@@ -142,10 +180,12 @@ def index():
     return render_template('index.html', aktif_sayfa='index')
 
 @app.route('/muhasebe')
+@permission_required('muhasebe')
 def muhasebe():
     return render_template('muhasebe.html', aktif_sayfa='muhasebe')
 
 @app.route('/finans')
+@permission_required('finans')
 def finans():
     return render_template('finans.html', aktif_sayfa='finans')
 
@@ -263,13 +303,121 @@ def get_cari_ekstre_df(year, date_val, cari_code):
     return df
 
 
+@app.template_filter('format_currency')
+def format_currency_filter(value):
+    if value is None:
+        return "-"
+    try:
+        val = round(float(value), 2)
+        if abs(val) == 0:
+            val = 0.0
+        formatted = f"{val:,.2f}"
+        return formatted.replace(',', '_').replace('.', ',').replace('_', '.')
+    except (ValueError, TypeError):
+        return str(value)
+
+import gunluk_nakit_akis
+
+@app.template_filter('friendly_bank')
+def friendly_bank_filter(value):
+    return gunluk_nakit_akis.get_friendly_bank_name(value)
+
 @app.route('/finans/cari-ekstre')
+@permission_required('cari_ekstre')
 def cari_ekstre():
     return render_template('cari_ekstre.html', aktif_sayfa='cari_ekstre')
 
 @app.route('/finans/cari-kapama')
+@permission_required('cari_kapama')
 def cari_kapama():
     return render_template('cari_kapama.html', aktif_sayfa='cari_kapama')
+
+@app.route('/finans/nakit-akis', methods=['GET', 'POST'], endpoint='nakit_akis')
+@app.route('/dashboard', methods=['GET', 'POST'], endpoint='dashboard')
+@permission_required('nakit_akis')
+def nakit_akis():
+    return gunluk_nakit_akis.dashboard()
+
+# Nakit Akış Alt İşlemleri (gunluk_nakit_akis modülü üzerinden doğrudan çalışır)
+@app.route('/export_eski_sablon', methods=['GET'], endpoint='export_eski_sablon_route')
+@permission_required('nakit_akis')
+def export_eski_sablon_route():
+    return gunluk_nakit_akis.export_eski_sablon_route()
+
+@app.route('/save_custom_payments', methods=['POST'], endpoint='save_custom_payments_route')
+@permission_required('nakit_akis')
+def save_custom_payments_route():
+    return gunluk_nakit_akis.save_custom_payments_route()
+
+@app.route('/toggle_payment_paid/<int:idx>', methods=['POST', 'GET'], endpoint='toggle_payment_paid_route')
+@permission_required('nakit_akis')
+def toggle_payment_paid_route(idx):
+    return gunluk_nakit_akis.toggle_payment_paid_route(idx)
+
+@app.route('/save_custom_payments_json', methods=['POST'], endpoint='save_custom_payments_json_route')
+@permission_required('nakit_akis')
+def save_custom_payments_json_route():
+    return gunluk_nakit_akis.save_custom_payments_json_route()
+
+@app.route('/toggle_credit_card_payment/<int:idx>', methods=['POST', 'GET'], endpoint='toggle_credit_card_payment_route')
+@permission_required('nakit_akis')
+def toggle_credit_card_payment_route(idx):
+    return gunluk_nakit_akis.toggle_credit_card_payment_route(idx)
+
+@app.route('/delete_custom_payment/<int:idx>', methods=['POST', 'GET'], endpoint='delete_custom_payment_route')
+@permission_required('nakit_akis')
+def delete_custom_payment_route(idx):
+    return gunluk_nakit_akis.delete_custom_payment_route(idx)
+
+@app.route('/delete_multiple_payments', methods=['POST'], endpoint='delete_multiple_payments_route')
+@permission_required('nakit_akis')
+def delete_multiple_payments_route():
+    return gunluk_nakit_akis.delete_multiple_payments_route()
+
+@app.route('/toggle_auto_clean', methods=['GET', 'POST'], endpoint='toggle_auto_clean_route')
+@permission_required('nakit_akis')
+def toggle_auto_clean_route():
+    return gunluk_nakit_akis.toggle_auto_clean_route()
+
+@app.route('/clear_past_payments', methods=['GET', 'POST'], endpoint='clear_past_payments_route')
+@permission_required('nakit_akis')
+def clear_past_payments_route():
+    return gunluk_nakit_akis.clear_past_payments_route()
+
+@app.route('/clear_all_payments', methods=['POST'], endpoint='clear_all_payments_route')
+@permission_required('nakit_akis')
+def clear_all_payments_route():
+    return gunluk_nakit_akis.clear_all_payments_route()
+
+@app.route('/save_budget', methods=['POST'], endpoint='save_budget_route')
+@permission_required('nakit_akis')
+def save_budget_route():
+    return gunluk_nakit_akis.save_budget_route()
+
+@app.route('/save_starting_cash', methods=['POST'], endpoint='save_starting_cash_route')
+@permission_required('nakit_akis')
+def save_starting_cash_route():
+    return gunluk_nakit_akis.save_starting_cash_route()
+
+@app.route('/save_assets', methods=['POST'], endpoint='save_assets_route')
+@permission_required('nakit_akis')
+def save_assets_route():
+    return gunluk_nakit_akis.save_assets_route()
+
+@app.route('/api/get_categories', methods=['GET'], endpoint='api_get_categories')
+@permission_required('nakit_akis')
+def api_get_categories():
+    return gunluk_nakit_akis.api_get_categories()
+
+@app.route('/api/add_category', methods=['POST'], endpoint='api_add_category')
+@permission_required('nakit_akis')
+def api_add_category():
+    return gunluk_nakit_akis.api_add_category()
+
+@app.route('/api/delete_category/<int:cat_id>', methods=['POST', 'DELETE'], endpoint='api_delete_category')
+@permission_required('nakit_akis')
+def api_delete_category(cat_id):
+    return gunluk_nakit_akis.api_delete_category(cat_id)
 
 @app.route('/finans/api/cariler')
 def api_cariler():
@@ -295,6 +443,18 @@ def api_cariler():
         return jsonify([])
 
 
+def detect_cari_currency(cari_name="", cari_code=""):
+    text_upper = f"{cari_code} {cari_name}".upper()
+    if 'USD' in text_upper or 'DOLAR' in text_upper:
+        return 'USD'
+    elif 'EUR' in text_upper or 'EURO' in text_upper:
+        return 'EUR'
+    elif 'GBP' in text_upper or 'STERLİN' in text_upper or 'STERLIN' in text_upper:
+        return 'GBP'
+    elif 'TL' in text_upper or 'TRY' in text_upper:
+        return 'TL'
+    return 'TL'
+
 @app.route('/finans/api/cari-ekstre-data')
 def api_cari_ekstre_data():
     year = request.args.get('year', '2026')
@@ -311,17 +471,36 @@ def api_cari_ekstre_data():
                 'html': '<div style="padding: 4rem 2rem; text-align: center; color: var(--text-muted);">Bu cari karta ait hareket bulunamadı.</div>',
                 't_borc': '0,00',
                 't_alacak': '0,00',
-                't_bakiye': '0,00'
+                't_bakiye': '0,00',
+                'currency': 'TL'
             })
 
         t_borc = float(df['BORC'].sum())
         t_alacak = float(df['ALACAK'].sum())
         t_bakiye = t_borc - t_alacak
 
+        # Döviz cinsini tespit et (Cari ünvanından veya kodundan)
+        sample_name = ""
+        for _, r in df.iterrows():
+            u = str(r.get('CARI_UNVAN', '') or '')
+            if u and u != 'Önceki Dönemden Devir':
+                sample_name = u
+                break
+        if not sample_name:
+            sample_name = cari
+
+        curr_code = detect_cari_currency(sample_name, cari)
+
         html = '<table class="ekstre-table"><thead><tr>'
-        html += '<th>Tarih</th><th>Özel Kod</th><th>Cari Ünvan</th>'
-        html += '<th>İşlem Türü</th><th>Fiş No</th><th>Açıklama</th>'
-        html += '<th class="text-right">Borç</th><th class="text-right">Alacak</th><th class="text-right">Bakiye</th></tr></thead><tbody>'
+        html += '<th style="width: 100px;">Tarih</th>'
+        html += '<th style="width: 80px;">Özel Kod</th>'
+        html += '<th style="width: 220px;">Cari Ünvan</th>'
+        html += '<th style="width: 130px;">İşlem Türü</th>'
+        html += '<th style="width: 100px;">Fiş No</th>'
+        html += '<th style="width: auto;">Açıklama</th>'
+        html += f'<th class="text-right" style="width: 110px;">Borç ({curr_code})</th>'
+        html += f'<th class="text-right" style="width: 110px;">Alacak ({curr_code})</th>'
+        html += f'<th class="text-right" style="width: 110px;">Bakiye ({curr_code})</th></tr></thead><tbody>'
 
         for _, row in df.iterrows():
             is_devir = row['CARI_UNVAN'] == 'Önceki Dönemden Devir'
@@ -331,13 +510,28 @@ def api_cari_ekstre_data():
             bakiye_val = float(row['BAKIYE'])
             bakiye_color = '#60a5fa' if bakiye_val == 0 else ('#f87171' if bakiye_val > 0 else '#34d399')
 
+            cari_unvan_raw = str(row["CARI_UNVAN"] or "-")
+            cari_unvan_esc = cari_unvan_raw.replace('"', '&quot;').replace('<', '&lt;').replace('>', '&gt;')
+            
+            islem_turu_raw = str(row["ISLEM_TURU"] or "-")
+            islem_turu_esc = islem_turu_raw.replace('"', '&quot;').replace('<', '&lt;').replace('>', '&gt;')
+            
+            fis_no_raw = str(row["FIS_NO"] or "-")
+            fis_no_esc = fis_no_raw.replace('"', '&quot;').replace('<', '&lt;').replace('>', '&gt;')
+            
+            aciklama_raw = str(row["ACIKLAMA"] or "-")
+            aciklama_esc = aciklama_raw.replace('"', '&quot;').replace('<', '&lt;').replace('>', '&gt;')
+            
+            ozel_kod_raw = str(row["OZEL_KOD"] or "-")
+            ozel_kod_esc = ozel_kod_raw.replace('"', '&quot;').replace('<', '&lt;').replace('>', '&gt;')
+
             html += f'<tr{row_class}>'
-            html += f'<td><strong style="color: #93c5fd;">{tarih_str}</strong></td>'
-            html += f'<td>{row["OZEL_KOD"] or "-"}</td>'
-            html += f'<td><span style="font-weight: 500;">{row["CARI_UNVAN"]}</span></td>'
-            html += f'<td><span class="badge-islem">{row["ISLEM_TURU"]}</span></td>'
-            html += f'<td><code style="color: #cbd5e1;">{row["FIS_NO"] or "-"}</code></td>'
-            html += f'<td style="max-width: 350px; word-break: break-word; color: var(--text-muted);">{row["ACIKLAMA"] or "-"}</td>'
+            html += f'<td title="{tarih_str}"><strong style="color: #93c5fd;">{tarih_str}</strong></td>'
+            html += f'<td class="cell-clickable" data-title="Özel Kod" data-text="{ozel_kod_esc}" title="{ozel_kod_esc}">{ozel_kod_esc}</td>'
+            html += f'<td class="cell-clickable" data-title="Cari Ünvan" data-text="{cari_unvan_esc}" title="{cari_unvan_esc}"><span style="font-weight: 500;">{cari_unvan_esc}</span></td>'
+            html += f'<td class="cell-clickable" data-title="İşlem Türü" data-text="{islem_turu_esc}" title="{islem_turu_esc}"><span class="badge-islem">{islem_turu_esc}</span></td>'
+            html += f'<td class="cell-clickable" data-title="Fiş No" data-text="{fis_no_esc}" title="{fis_no_esc}"><code style="color: #cbd5e1;">{fis_no_esc}</code></td>'
+            html += f'<td class="cell-clickable" data-title="Açıklama" data-text="{aciklama_esc}" title="{aciklama_esc}" style="color: var(--text-muted);">{aciklama_esc}</td>'
             html += f'<td class="text-right" style="color: #fca5a5;">{format_currency(row["BORC"])}</td>'
             html += f'<td class="text-right" style="color: #86efac;">{format_currency(row["ALACAK"])}</td>'
             html += f'<td class="text-right" style="font-weight: 700; color: {bakiye_color};">{format_currency(bakiye_val)}</td>'
@@ -349,7 +543,8 @@ def api_cari_ekstre_data():
             'html': html,
             't_borc': format_currency(t_borc),
             't_alacak': format_currency(t_alacak),
-            't_bakiye': format_currency(t_bakiye)
+            't_bakiye': format_currency(t_bakiye),
+            'currency': curr_code
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -380,10 +575,12 @@ def export_cari_ekstre():
         return f"Excel dışa aktarma hatası: {str(e)}", 500
 
 @app.route('/raporlar')
+@permission_required('raporlar')
 def raporlar():
     return render_template('raporlar.html', aktif_sayfa='raporlar')
 
 @app.route('/parametreler')
+@permission_required('parametreler')
 def parametreler():
     connections = load_db_config()
     users_raw = load_users()
@@ -392,11 +589,12 @@ def parametreler():
         {
             'username': u.get('username'),
             'name': u.get('name', u.get('username')),
-            'role': u.get('role', 'user')
+            'role': u.get('role', 'user'),
+            'allowed_pages': u.get('allowed_pages', ['index', 'muhasebe', 'cari_ekstre', 'cari_kapama', 'nakit_akis', 'finans', 'raporlar']) if u.get('role') != 'admin' else ['*']
         }
         for u in users_raw
     ]
-    return render_template('parametreler.html', aktif_sayfa='parametreler', connections=connections, users=users)
+    return render_template('parametreler.html', aktif_sayfa='parametreler', connections=connections, users=users, system_pages=ALL_SYSTEM_PAGES)
 
 @app.route('/api/users/add', methods=['POST'])
 def add_user_api():
@@ -408,6 +606,7 @@ def add_user_api():
     name = data.get('name', '').strip() or username
     password = data.get('password', '')
     role = data.get('role', 'user')
+    allowed_pages = data.get('allowed_pages', [])
 
     if not username or not password:
         return jsonify({'success': False, 'message': 'Kullanıcı adı ve şifre zorunludur.'}), 400
@@ -420,16 +619,57 @@ def add_user_api():
         if u.get('username', '').lower() == username:
             return jsonify({'success': False, 'message': f"'{username}' kullanıcı adı zaten kullanımda."}), 400
 
+    if role == 'admin':
+        allowed_pages = ['*']
+    elif not allowed_pages:
+        allowed_pages = ['index', 'muhasebe', 'cari_ekstre', 'cari_kapama', 'finans', 'raporlar']
+
     users.append({
         'username': username,
         'name': name,
         'password_hash': generate_password_hash(password),
-        'role': role
+        'role': role,
+        'allowed_pages': allowed_pages
     })
 
     if save_users(users):
         return jsonify({'success': True, 'message': f"'{username}' kullanıcısı başarıyla eklendi."})
     return jsonify({'success': False, 'message': 'Kullanıcı kaydedilemedi.'}), 500
+
+@app.route('/api/users/edit-permissions', methods=['POST'])
+def edit_user_permissions_api():
+    if 'user' not in session or session['user'].get('role') != 'admin':
+        return jsonify({'success': False, 'message': 'Bu işlem için yönetici yetkisi gereklidir.'}), 403
+
+    data = request.get_json() or {}
+    target_username = data.get('username', '').strip().lower()
+    name = data.get('name', '').strip()
+    role = data.get('role', 'user')
+    allowed_pages = data.get('allowed_pages', [])
+
+    if not target_username:
+        return jsonify({'success': False, 'message': 'Kullanıcı adı belirtilmedi.'}), 400
+
+    users = load_users()
+    user_found = False
+    for u in users:
+        if u.get('username', '').lower() == target_username:
+            if name:
+                u['name'] = name
+            u['role'] = role
+            u['allowed_pages'] = ['*'] if role == 'admin' else allowed_pages
+            user_found = True
+            
+            # Eğer kendi oturumumuz güncelleniyorsa session'ı da güncelle
+            if target_username == session['user']['username'].lower():
+                session['user']['name'] = u['name']
+                session['user']['role'] = role
+                session['user']['allowed_pages'] = u['allowed_pages']
+            break
+
+    if user_found and save_users(users):
+        return jsonify({'success': True, 'message': f"'{target_username}' kullanıcısının yetkileri güncellendi."})
+    return jsonify({'success': False, 'message': 'Kullanıcı bulunamadı.'}), 404
 
 @app.route('/api/users/reset-password', methods=['POST'])
 def admin_reset_password_api():

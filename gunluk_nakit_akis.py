@@ -8,7 +8,10 @@ import pandas as pd
 import urllib
 from datetime import datetime, timedelta
 
-from export_eski_sablon import generate_eski_sablon_excel
+try:
+    from export_eski_sablon import generate_eski_sablon_excel
+except ImportError:
+    generate_eski_sablon_excel = None
 
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
@@ -504,6 +507,77 @@ def get_open_payables_balances():
         'sanayi': empty_val,
         'navlun': empty_val
     }
+
+def get_virman_lists(target_date):
+    """
+    Logo Tiger Banka Virman Fişlerini (TRCODE=2, MODULENR=7) çeker.
+    Giren bankaları (SIGN=0) sol liste (incoming_virman) için,
+    Çıkan bankaları (SIGN=1) sağ liste (outgoing_virman) için hazırlar.
+    Karşı banka adını (KARSI_BANKA) her iki tarafa da otomatik iliştirir.
+    """
+    query = f"""
+    SELECT
+        BNFLINE.LOGICALREF,
+        BNFLINE.SOURCEFREF,
+        BNFICHE.FICHENO,
+        BNFLINE.DATE_ AS TARIH,
+        BNFLINE.SIGN,
+        BNFLINE.AMOUNT AS TL_TUTAR,
+        BNFLINE.TRNET AS DOVIZLI_TUTAR,
+        CASE BANKACC.CURRENCY WHEN 0 THEN 'TL' WHEN 1 THEN 'USD' WHEN 20 THEN 'EUR' ELSE ISNULL(L_CURRENCYLIST.CURCODE, '') END AS HESAP_DOVIZI_RAPOR,
+        BANKACC.DEFINITION_ AS HESAP_ACIKLAMASI,
+        BANKACC.CODE AS HESAP_KODU,
+        BANKACC.ACCOUNTNO AS HESAP_NO,
+        BNFLINE.LINEEXP AS SATIR_ACIKLAMASI,
+        ISNULL(BNFICHE.GENEXP1, '') +' '+ ISNULL(BNFICHE.GENEXP2, '') AS FIS_ACIKLAMASI
+    FROM LG_{Firma}_{Donem}_BNFLINE BNFLINE WITH(NOLOCK)
+    LEFT JOIN LG_{Firma}_{Donem}_BNFICHE BNFICHE WITH(NOLOCK) ON BNFICHE.LOGICALREF = BNFLINE.SOURCEFREF
+    LEFT JOIN LG_{Firma}_BANKACC BANKACC WITH(NOLOCK) ON BANKACC.LOGICALREF = BNFLINE.BNACCREF
+    LEFT OUTER JOIN L_CURRENCYLIST WITH(NOLOCK) ON L_CURRENCYLIST.CURTYPE = BANKACC.CURRENCY
+    WHERE BNFLINE.MODULENR = 7
+      AND BNFLINE.TRCODE = 2
+      AND NOT (BANKACC.CODE LIKE '50.%' OR BANKACC.CARDTYPE IN (5, 6))
+      AND CONVERT(VARCHAR, BNFLINE.DATE_, 23) = '{target_date}'
+    ORDER BY BNFLINE.SOURCEFREF, BNFLINE.SIGN
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+            
+        incoming_virman = []
+        outgoing_virman = []
+        if not df.empty:
+            for sf_ref, group in df.groupby('SOURCEFREF'):
+                inc_rows = group[group['SIGN'] == 0].to_dict('records')
+                out_rows = group[group['SIGN'] == 1].to_dict('records')
+                
+                out_bank_names = ", ".join([clean_bank_name(r['HESAP_ACIKLAMASI']) for r in out_rows if r['HESAP_ACIKLAMASI']])
+                inc_bank_names = ", ".join([clean_bank_name(r['HESAP_ACIKLAMASI']) for r in inc_rows if r['HESAP_ACIKLAMASI']])
+                
+                for r in inc_rows:
+                    r_copy = dict(r)
+                    r_copy['HESAP_ACIKLAMASI'] = clean_bank_name(r_copy['HESAP_ACIKLAMASI'])
+                    r_copy['KARSI_BANKA'] = out_bank_names or '-'
+                    r_copy['FIS_TURU'] = 'Banka Virman Girişi'
+                    r_copy['FICHENO'] = str(r_copy.get('FICHENO') or '').strip()
+                    if r_copy['FICHENO'] == 'nan':
+                        r_copy['FICHENO'] = ''
+                    incoming_virman.append(r_copy)
+                    
+                for r in out_rows:
+                    r_copy = dict(r)
+                    r_copy['HESAP_ACIKLAMASI'] = clean_bank_name(r_copy['HESAP_ACIKLAMASI'])
+                    r_copy['KARSI_BANKA'] = inc_bank_names or '-'
+                    r_copy['FIS_TURU'] = 'Banka Virman Çıkışı'
+                    r_copy['FICHENO'] = str(r_copy.get('FICHENO') or '').strip()
+                    if r_copy['FICHENO'] == 'nan':
+                        r_copy['FICHENO'] = ''
+                    outgoing_virman.append(r_copy)
+                    
+        return incoming_virman, outgoing_virman
+    except Exception as e:
+        print(f"get_virman_lists hata: {e}")
+        return [], []
 
 def get_incoming_transfers(target_date, filter_virman=False):
     virman_bank_filter = "AND BNFLINE.TRCODE NOT IN (2)" if filter_virman else ""
@@ -1560,18 +1634,16 @@ def dashboard():
         own_checks = get_own_check_details(selected_date)
         customer_checks = get_customer_check_details(selected_date)
         
-        # Bank incoming transfers query (raw for Tab 2: includes virman, all transactions)
-        raw_incoming_transfers = get_incoming_transfers(selected_date, filter_virman=False)
-        total_incoming_transfers_tl = sum(r['TL_TUTAR'] for r in raw_incoming_transfers)
-        
-        incoming_total_tl = sum(r['TL_TUTAR'] for r in raw_incoming_transfers if r['HESAP_DOVIZI_RAPOR'] == 'TL')
-        incoming_total_usd = sum(r['DOVIZLI_TUTAR'] for r in raw_incoming_transfers if r['HESAP_DOVIZI_RAPOR'] == 'USD')
-        incoming_total_eur = sum(r['DOVIZLI_TUTAR'] for r in raw_incoming_transfers if r['HESAP_DOVIZI_RAPOR'] == 'EUR')
+        # Bank virman transfers (Sol: Giren Bankalar, Sağ: Çıkan Bankalar)
+        incoming_virman, outgoing_virman = get_virman_lists(selected_date)
+
+        # Bank incoming transfers query (Tab 2: virman dışı gelenler)
+        raw_incoming_transfers = get_incoming_transfers(selected_date, filter_virman=True)
 
         # Grouping incoming transfers for Tab 2 (Günlük Finans Hareketleri)
         grouped_incoming = {
             'havale': [],
-            'virman': [],
+            'virman': incoming_virman,
             'kredi_kart': [],
             'kasa': [],
             'diger': []
@@ -1588,8 +1660,6 @@ def dashboard():
                 grouped_incoming['kasa'].append(r)
             elif 'kredi kart' in fis_turu_lower or 'kredi kart' in hesap_turu_lower or ' kk' in hesap_aciklamasi_lower or '/ kk' in hesap_aciklamasi_lower:
                 grouped_incoming['kredi_kart'].append(r)
-            elif 'virman' in fis_turu_lower or 'virman' in satir_exp_lower or 'virman' in fis_exp_lower:
-                grouped_incoming['virman'].append(r)
             elif 'havale' in fis_turu_lower or 'eft' in fis_turu_lower:
                 grouped_incoming['havale'].append(r)
             else:
@@ -1603,19 +1673,19 @@ def dashboard():
                 'USD': sum(r['DOVIZLI_TUTAR'] for r in items if r['HESAP_DOVIZI_RAPOR'] == 'USD'),
                 'EUR': sum(r['DOVIZLI_TUTAR'] for r in items if r['HESAP_DOVIZI_RAPOR'] == 'EUR')
             }
+            
+        total_incoming_transfers_tl = sum(incoming_totals[k]['TL'] for k in incoming_totals)
+        incoming_total_tl = sum(incoming_totals[k]['TL'] for k in incoming_totals)
+        incoming_total_usd = sum(incoming_totals[k]['USD'] for k in incoming_totals)
+        incoming_total_eur = sum(incoming_totals[k]['EUR'] for k in incoming_totals)
         
-        # Bank outgoing transfers query (raw for Tab 2: includes virman and unaggregated navlun plate lines)
-        raw_outgoing_transfers = get_outgoing_transfers(selected_date, filter_virman=False, aggregate_navlun=False)
-        total_outgoing_transfers_tl = sum(r['TL_TUTAR'] for r in raw_outgoing_transfers)
-        
-        outgoing_total_tl = sum(r['TL_TUTAR'] for r in raw_outgoing_transfers if r['HESAP_DOVIZI_RAPOR'] == 'TL')
-        outgoing_total_usd = sum(r['DOVIZLI_TUTAR'] for r in raw_outgoing_transfers if r['HESAP_DOVIZI_RAPOR'] == 'USD')
-        outgoing_total_eur = sum(r['DOVIZLI_TUTAR'] for r in raw_outgoing_transfers if r['HESAP_DOVIZI_RAPOR'] == 'EUR')
+        # Bank outgoing transfers query (Tab 2: virman dışı çıkanlar)
+        raw_outgoing_transfers = get_outgoing_transfers(selected_date, filter_virman=True, aggregate_navlun=False)
 
         # Grouping outgoing transfers for Tab 2 (Günlük Finans Hareketleri)
         grouped_outgoing = {
             'banka': [],
-            'virman': [],
+            'virman': outgoing_virman,
             'kredi_kart': [],
             'kasa': [],
             'diger': []
@@ -1632,8 +1702,6 @@ def dashboard():
                 grouped_outgoing['kasa'].append(r)
             elif 'kredi kart' in fis_turu_lower or 'kredi kart' in hesap_turu_lower or ' kk' in hesap_aciklamasi_lower or '/ kk' in hesap_aciklamasi_lower:
                 grouped_outgoing['kredi_kart'].append(r)
-            elif 'virman' in fis_turu_lower or 'virman' in satir_exp_lower or 'virman' in fis_exp_lower:
-                grouped_outgoing['virman'].append(r)
             elif ('havale' in fis_turu_lower or 'eft' in fis_turu_lower or 'giden' in fis_turu_lower
                   or 'çek öde' in fis_turu_lower or 'cek ode' in fis_turu_lower
                   or 'banka çek' in fis_turu_lower or 'banka cek' in fis_turu_lower):
@@ -1649,6 +1717,11 @@ def dashboard():
                 'USD': sum(r['DOVIZLI_TUTAR'] for r in items if r['HESAP_DOVIZI_RAPOR'] == 'USD'),
                 'EUR': sum(r['DOVIZLI_TUTAR'] for r in items if r['HESAP_DOVIZI_RAPOR'] == 'EUR')
             }
+            
+        total_outgoing_transfers_tl = sum(outgoing_totals[k]['TL'] for k in outgoing_totals)
+        outgoing_total_tl = sum(outgoing_totals[k]['TL'] for k in outgoing_totals)
+        outgoing_total_usd = sum(outgoing_totals[k]['USD'] for k in outgoing_totals)
+        outgoing_total_eur = sum(outgoing_totals[k]['EUR'] for k in outgoing_totals)
 
         # Filtered & Aggregated transfers for Tab 3 (Şablon Görünümü)
         incoming_transfers = get_incoming_transfers(selected_date, filter_virman=True)
@@ -2711,6 +2784,7 @@ def dashboard():
         customer_checks_dict = customer_checks.to_dict('records') if (hasattr(customer_checks, 'to_dict') and not customer_checks.empty) else []
 
         return render_template("gunluk_nakit_akıs.html", 
+                               aktif_sayfa='nakit_akis',
                                next_day_payments=next_day_payments,
                                next_business_date_formatted=next_business_date_formatted,
                                sol_toplam_tl=sol_toplam_tl,

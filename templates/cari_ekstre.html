@@ -169,49 +169,41 @@
         table-layout: fixed;
     }
 
-    /* Sütun Genişlikleri - tabloya tam sığacak şekilde */
-    .ekstre-table thead th:nth-child(1) { width: 80px; }   /* Tarih */
-    .ekstre-table thead th:nth-child(2) { width: 70px; }   /* Özel Kod */
-    .ekstre-table thead th:nth-child(3) { width: 18%; }    /* Cari Ünvan */
-    .ekstre-table thead th:nth-child(4) { width: 120px; }  /* İşlem Türü */
-    .ekstre-table thead th:nth-child(5) { width: 90px; }   /* Fiş No */
-    .ekstre-table thead th:nth-child(6) { width: auto; }   /* Açıklama - kalan yer */
-    .ekstre-table thead th:nth-child(7) { width: 100px; }  /* Borç */
-    .ekstre-table thead th:nth-child(8) { width: 100px; }  /* Alacak */
-    .ekstre-table thead th:nth-child(9) { width: 100px; }  /* Bakiye */
-
-    .ekstre-table tbody td {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    /* Açıklama ve Cari sütunlarında kelime kaydırma */
-    .ekstre-table tbody td:nth-child(3),
-    .ekstre-table tbody td:nth-child(6) {
-        white-space: normal;
-        word-break: break-word;
-    }
+    /* Sütun Genişlikleri - Tek satırda tam sığacak ve taşmayacak şekilde */
+    .ekstre-table thead th:nth-child(1) { width: 100px; min-width: 100px; }  /* Tarih */
+    .ekstre-table thead th:nth-child(2) { width: 80px; min-width: 80px; }    /* Özel Kod */
+    .ekstre-table thead th:nth-child(3) { width: 220px; min-width: 180px; }  /* Cari Ünvan */
+    .ekstre-table thead th:nth-child(4) { width: 130px; min-width: 120px; }  /* İşlem Türü */
+    .ekstre-table thead th:nth-child(5) { width: 100px; min-width: 90px; }   /* Fiş No */
+    .ekstre-table thead th:nth-child(6) { width: auto; min-width: 220px; }    /* Açıklama */
+    .ekstre-table thead th:nth-child(7) { width: 110px; min-width: 100px; }  /* Borç */
+    .ekstre-table thead th:nth-child(8) { width: 110px; min-width: 100px; }  /* Alacak */
+    .ekstre-table thead th:nth-child(9) { width: 110px; min-width: 100px; }  /* Bakiye */
 
     .ekstre-table thead th {
         position: sticky;
         top: 0;
         background: #0f172a;
         color: #94a3b8;
-        padding: 0.75rem 0.85rem;
+        padding: 0.7rem 0.75rem;
         font-weight: 600;
         border-bottom: 2px solid var(--border-color);
         z-index: 10;
         white-space: nowrap;
     }
 
+    .ekstre-table tbody tr {
+        height: 38px;
+    }
+
     .ekstre-table tbody td {
-        padding: 0.6rem 0.75rem;
+        padding: 0.45rem 0.75rem;
         border-bottom: 1px solid rgba(255, 255, 255, 0.04);
         vertical-align: middle;
         overflow: hidden;
         text-overflow: ellipsis;
-        white-space: nowrap;
+        white-space: nowrap !important;
+        max-width: 0;
     }
 
     .ekstre-table tbody tr:nth-child(even) {
@@ -240,6 +232,117 @@
         font-size: 0.75rem;
         background: rgba(255, 255, 255, 0.05);
         color: #cbd5e1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 100%;
+    }
+
+    /* Tıklanabilir ve Tam Gösterilebilir Hücreler */
+    .cell-clickable {
+        cursor: pointer;
+        transition: background-color 0.15s ease, color 0.15s ease;
+    }
+
+    .cell-clickable:hover {
+        background-color: rgba(59, 130, 246, 0.18) !important;
+        color: #93c5fd !important;
+    }
+
+    /* Detay Göster Popover / Modal */
+    .cell-detail-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.65);
+        backdrop-filter: blur(3px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.2s ease;
+    }
+
+    .cell-detail-overlay.active {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .cell-detail-modal {
+        background: #1e293b;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 0.85rem;
+        width: 90%;
+        max-width: 520px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+        transform: translateY(10px) scale(0.98);
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        overflow: hidden;
+    }
+
+    .cell-detail-overlay.active .cell-detail-modal {
+        transform: translateY(0) scale(1);
+    }
+
+    .cell-detail-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        background: #0f172a;
+    }
+
+    .cell-detail-title {
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: #93c5fd;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .cell-detail-close {
+        background: none;
+        border: none;
+        color: #94a3b8;
+        font-size: 1.25rem;
+        cursor: pointer;
+        padding: 0.2rem 0.5rem;
+        border-radius: 0.35rem;
+        line-height: 1;
+        transition: all 0.15s ease;
+    }
+
+    .cell-detail-close:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: #fff;
+    }
+
+    .cell-detail-body {
+        padding: 1.25rem;
+        font-size: 0.92rem;
+        color: #f1f5f9;
+        line-height: 1.6;
+        word-break: break-word;
+        max-height: 350px;
+        overflow-y: auto;
+        background: #172033;
+        user-select: text;
+        font-family: inherit;
+    }
+
+    .cell-detail-footer {
+        padding: 0.85rem 1.25rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.75rem;
+        background: #0f172a;
     }
 </style>
 
@@ -306,15 +409,15 @@
         <div class="summary-grid" id="summary-section" style="display: none;">
             <div class="kpi-card">
                 <span class="kpi-title">Toplam Borç</span>
-                <span class="kpi-value borc" id="stat-borc">0,00 ₺</span>
+                <span class="kpi-value borc" id="stat-borc">0,00 TL</span>
             </div>
             <div class="kpi-card">
                 <span class="kpi-title">Toplam Alacak</span>
-                <span class="kpi-value alacak" id="stat-alacak">0,00 ₺</span>
+                <span class="kpi-value alacak" id="stat-alacak">0,00 TL</span>
             </div>
             <div class="kpi-card" style="border-color: rgba(59, 130, 246, 0.4); background: rgba(59, 130, 246, 0.05);">
                 <span class="kpi-title">Kümülatif Bakiye</span>
-                <span class="kpi-value bakiye" id="stat-bakiye">0,00 ₺</span>
+                <span class="kpi-value bakiye" id="stat-bakiye">0,00 TL</span>
             </div>
         </div>
     </div>
@@ -330,7 +433,39 @@
     </div>
 </div>
 
+<!-- Hücre Detay Göster Popover / Modal -->
+<div id="cellDetailOverlay" class="cell-detail-overlay" onclick="handleOverlayClick(event)">
+    <div class="cell-detail-modal">
+        <div class="cell-detail-header">
+            <div class="cell-detail-title">
+                <span>📄</span>
+                <span id="cellDetailTitle">Detay</span>
+            </div>
+            <button type="button" class="cell-detail-close" onclick="closeCellDetail()">✕</button>
+        </div>
+        <div id="cellDetailBody" class="cell-detail-body"></div>
+        <div class="cell-detail-footer">
+            <button type="button" class="btn btn-outline" id="btnCopyDetail" onclick="copyCellDetail()" style="padding: 0.4rem 0.85rem; font-size: 0.82rem;">
+                📋 Kopyala
+            </button>
+            <button type="button" class="btn btn-primary" onclick="closeCellDetail()" style="padding: 0.4rem 0.85rem; font-size: 0.82rem;">
+                Kapat
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
+    function detectCurrencyFromText(text) {
+        if (!text) return 'TL';
+        const upper = text.toUpperCase();
+        if (upper.includes('USD') || upper.includes('DOLAR')) return 'USD';
+        if (upper.includes('EUR') || upper.includes('EURO')) return 'EUR';
+        if (upper.includes('GBP') || upper.includes('STERLİN') || upper.includes('STERLIN')) return 'GBP';
+        if (upper.includes('TL') || upper.includes('TRY')) return 'TL';
+        return 'TL';
+    }
+
     $(document).ready(function() {
         // Select2 Başlat
         $('#cariSelect').select2({
@@ -371,7 +506,53 @@
                 loadEkstreData();
             }
         });
+
+        // Tıklanan hücrenin tam metnini aç
+        $(document).on('click', '.cell-clickable', function(e) {
+            e.stopPropagation();
+            const text = $(this).attr('data-text') || $(this).text().trim();
+            const title = $(this).attr('data-title') || 'Detay';
+            
+            if (text && text !== '-' && text !== '---') {
+                showCellDetail(title, text);
+            }
+        });
+
+        // ESC tuşuyla popup kapatma
+        $(document).on('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeCellDetail();
+            }
+        });
     });
+
+    // Detay Popover Açma & Kapatma
+    function showCellDetail(title, text) {
+        $('#cellDetailTitle').text(title);
+        $('#cellDetailBody').text(text);
+        $('#btnCopyDetail').html('📋 Kopyala');
+        $('#cellDetailOverlay').addClass('active');
+    }
+
+    function closeCellDetail() {
+        $('#cellDetailOverlay').removeClass('active');
+    }
+
+    function handleOverlayClick(e) {
+        if (e.target.id === 'cellDetailOverlay') {
+            closeCellDetail();
+        }
+    }
+
+    function copyCellDetail() {
+        const text = $('#cellDetailBody').text();
+        navigator.clipboard.writeText(text).then(function() {
+            $('#btnCopyDetail').html('✓ Kopyalandı!');
+            setTimeout(function() {
+                $('#btnCopyDetail').html('📋 Kopyala');
+            }, 1800);
+        });
+    }
 
     // Cari Ekstre Sorgusunu Çalıştır
     function loadEkstreData() {
@@ -383,6 +564,9 @@
             alert('Lütfen listelemek istediğiniz cari kartı seçin.');
             return;
         }
+
+        const selectedText = $('#cariSelect option:selected').text();
+        const fallbackCurr = detectCurrencyFromText(selectedText);
 
         $('#table-wrapper').html(`
             <div style="text-align: center; padding: 4rem 2rem; color: #60a5fa;">
@@ -403,9 +587,10 @@
                 $('#summary-section').hide();
             } else {
                 $('#table-wrapper').html(res.html);
-                $('#stat-borc').text(`${res.t_borc} ₺`);
-                $('#stat-alacak').text(`${res.t_alacak} ₺`);
-                $('#stat-bakiye').text(`${res.t_bakiye} ₺`);
+                const curr = res.currency || fallbackCurr || 'TL';
+                $('#stat-borc').text(`${res.t_borc} ${curr}`);
+                $('#stat-alacak').text(`${res.t_alacak} ${curr}`);
+                $('#stat-bakiye').text(`${res.t_bakiye} ${curr}`);
                 $('#summary-section').show();
             }
         }).fail(function() {
