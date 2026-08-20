@@ -237,6 +237,39 @@ def get_own_check_details(target_date, limit_date=True):
     return df
 
 def get_customer_check_details(target_date, limit_date=True):
+    if _USE_BRIDGE:
+        try:
+            data = _bridge_get('/bridge/nakit/customer-checks', {'date': target_date, 'limit_date': str(limit_date).lower()})
+            df = pd.DataFrame(data.get('rows', []))
+            if not df.empty:
+                if 'VADE' in df.columns:
+                    df['VADE'] = pd.to_datetime(df['VADE'], errors='coerce')
+                    df['ORJ_VADE'] = df['VADE'].dt.strftime('%d.%m.%Y')
+                    def adjust_vade_bridge(row):
+                        banka = str(row.get('BANKA', '') or '').upper().replace('İ', 'I').replace('Ş', 'S').replace('Ğ', 'G').replace('Ü', 'U').replace('Ö', 'O').replace('Ç', 'C')
+                        our_bank = str(row.get('OUR_BANK', '') or '').upper().replace('İ', 'I').replace('Ş', 'S').replace('Ğ', 'G').replace('Ü', 'U').replace('Ö', 'O').replace('Ç', 'C')
+                        if 'QNB' in banka: banka = banka.replace('QNB', 'FINANSBANK')
+                        if 'QNB' in our_bank: our_bank = our_bank.replace('QNB', 'FINANSBANK')
+                        vade = row['VADE']
+                        durum = row.get('DURUM_KODU')
+                        if durum == 1:
+                            return get_first_business_day(vade)
+                        if not row.get('BANKA') or not row.get('OUR_BANK'):
+                            return get_first_business_day(vade + timedelta(days=1))
+                        ignore = {'BANKASI', 'BANK', 'A.S.', 'T.A.S.', 'A.S', 'T.A.S', 'VE', 'TURKIYE', 'TC', 'T.C.', 'T.C', 'YENI', 'SUBESI', 'SUBE'}
+                        b_words = [w for w in banka.split() if len(w) > 2 and w not in ignore]
+                        o_words = [w for w in our_bank.split() if len(w) > 2 and w not in ignore]
+                        is_same = any(any(bw in ow for ow in o_words) or bw in our_bank for bw in b_words) or \
+                                  any(any(ow in bw for bw in b_words) or ow in banka for ow in o_words)
+                        return get_first_business_day(vade) if is_same else get_first_business_day(vade + timedelta(days=1))
+                    df['VADE'] = df.apply(adjust_vade_bridge, axis=1)
+                    if limit_date:
+                        df = df[df['VADE'] <= pd.to_datetime(target_date)]
+                    df = df.sort_values(by='VADE')
+            return df
+        except Exception as e:
+            print(f"Bridge customer-checks hata: {e}")
+            return pd.DataFrame()
     date_filter = f"AND CONVERT(VARCHAR, CSC.DUEDATE, 23) <= '{target_date}'" if limit_date else ""
     query = f"""
     SELECT 
