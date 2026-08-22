@@ -11,7 +11,7 @@ import requests as _bridge_requests
 
 # --- Bridge Konfigürasyonu (Render ortamı için) ---
 _BRIDGE_URL = os.environ.get('BRIDGE_URL', '').rstrip('/')
-_BRIDGE_KEY = os.environ.get('BRIDGE_API_KEY', 'nexlog_bridge_2026_secure_xKj9')
+_BRIDGE_KEY = os.environ.get('BRIDGE_API_KEY', '')
 _USE_BRIDGE = bool(_BRIDGE_URL)
 
 def _bridge_get(path, params=None, timeout=30):

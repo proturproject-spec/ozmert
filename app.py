@@ -1,6 +1,7 @@
 import json
 import os
 import time
+import secrets
 import requests as http_requests
 from datetime import timedelta
 import io
@@ -11,19 +12,82 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import create_engine, text
 from db_manager import load_db_config, save_db_config, build_connection_uri, get_engine
 
-# Render ortamında: BRIDGE_URL env değişkeni ile yerel SQL köprüsüne bağlan
-# Örnek: BRIDGE_URL=https://xxxx.ngrok-free.app
+# ============================================================
+# HASSAS VERİLER VE ORTAM DEĞİŞKENLERİ ZORUNLULUĞU
+# ============================================================
+# Kod içine asla varsayılan gizli anahtar yazılmaz.
+SECRET_KEY = os.environ.get('SECRET_KEY')
+if not SECRET_KEY:
+    if os.environ.get('RENDER') or os.environ.get('PORT'):
+        raise RuntimeError("KRİTİK GÜVENLİK HATASI: Canlı sunucuda 'SECRET_KEY' ortam değişkeni zorunludur! Lütfen Render Environment sekmesinden SECRET_KEY tanımlayın.")
+    else:
+        SECRET_KEY = secrets.token_hex(32)
+        print("BİLGİ: 'SECRET_KEY' ortam değişkeni tanımlanmadığı için lokal ortamda dinamik güvenli anahtar üretildi.")
+
 BRIDGE_URL = os.environ.get('BRIDGE_URL', '').rstrip('/')
-BRIDGE_KEY = os.environ.get('BRIDGE_API_KEY', 'nexlog_bridge_2026_secure_xKj9')
+BRIDGE_KEY = os.environ.get('BRIDGE_API_KEY', '')
 USE_BRIDGE = bool(BRIDGE_URL)  # Eğer BRIDGE_URL varsa SQL bridge'i kullan
 
-app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'finans_muhasebe_secret_key_2025_secure_xyz')
+if USE_BRIDGE and not BRIDGE_KEY:
+    raise RuntimeError("KRİTİK GÜVENLİK HATASI: Köprü modu (BRIDGE_URL) aktifken 'BRIDGE_API_KEY' ortam değişkeni zorunludur!")
 
-# Güvenlik Ayarları: Sayfa kapanınca oturum silinir, maksimum 5 dakika işlem yapılmazsa kilitlenir
+app = Flask(__name__)
+app.secret_key = SECRET_KEY
+
+# Güvenlik Ayarları (HTTPS Zorunluluğu, XSS ve CSRF Koruması)
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=5)
-app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = True      # HTTPS Zorunluluğu: Çerezler sadece şifreli HTTPS üzerinden iletilir
+app.config['SESSION_COOKIE_HTTPONLY'] = True    # XSS Koruması: JavaScript çerezlere erişemez
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'    # CSRF Koruması
+
+# ============================================================
+# İSTEK SINIRLANDIRMASI (RATE LIMITING) - Giriş Sayfası Koruması
+# ============================================================
+_LOGIN_ATTEMPTS = {}  # { ip: [timestamp, ...] }
+_LOGIN_LOCKOUTS = {}  # { ip: lockout_expiry_timestamp }
+
+MAX_LOGIN_ATTEMPTS = 5       # 5 dakika içinde izin verilen maksimum başarısız deneme
+LOGIN_WINDOW_SECONDS = 300   # 5 dakika (300 saniye)
+LOCKOUT_DURATION = 900       # Kilitlenme süresi: 15 dakika (900 saniye)
+
+def get_client_ip():
+    """İstemcinin gerçek IP adresini döner."""
+    if request.headers.get('X-Forwarded-For'):
+        return request.headers.get('X-Forwarded-For').split(',')[0].strip()
+    return request.remote_addr or '127.0.0.1'
+
+def is_ip_rate_limited(ip):
+    """IP kilitli mi kontrol eder. Kalan kilit saniyesini döner, kilitli değilse 0."""
+    now = time.time()
+    if ip in _LOGIN_LOCKOUTS:
+        expiry = _LOGIN_LOCKOUTS[ip]
+        if now < expiry:
+            return int(expiry - now)
+        else:
+            del _LOGIN_LOCKOUTS[ip]
+            _LOGIN_ATTEMPTS[ip] = []
+            
+    attempts = [t for t in _LOGIN_ATTEMPTS.get(ip, []) if now - t < LOGIN_WINDOW_SECONDS]
+    _LOGIN_ATTEMPTS[ip] = attempts
+    
+    if len(attempts) >= MAX_LOGIN_ATTEMPTS:
+        _LOGIN_LOCKOUTS[ip] = now + LOCKOUT_DURATION
+        return LOCKOUT_DURATION
+    return 0
+
+def record_failed_login(ip):
+    """Başarısız giriş denemesini kaydeder."""
+    now = time.time()
+    if ip not in _LOGIN_ATTEMPTS:
+        _LOGIN_ATTEMPTS[ip] = []
+    _LOGIN_ATTEMPTS[ip].append(now)
+    if len(_LOGIN_ATTEMPTS[ip]) >= MAX_LOGIN_ATTEMPTS:
+        _LOGIN_LOCKOUTS[ip] = now + LOCKOUT_DURATION
+
+def clear_login_attempts(ip):
+    """Başarılı girişte IP kısıtını sıfırlar."""
+    _LOGIN_ATTEMPTS.pop(ip, None)
+    _LOGIN_LOCKOUTS.pop(ip, None)
 
 INACTIVITY_TIMEOUT_SECONDS = 300  # 5 Dakika (300 saniye)
 USERS_FILE = os.path.join(os.path.dirname(__file__), 'users.json')
@@ -139,7 +203,15 @@ def login():
     if 'user' in session:
         return redirect(url_for('index'))
     
+    client_ip = get_client_ip()
+    remaining_lock = is_ip_rate_limited(client_ip)
+    
     error = None
+    if remaining_lock > 0:
+        minutes = (remaining_lock // 60) + 1
+        error = f'Güvenlik uyarısı: Çok fazla hatalı giriş denemesi yapıldı. Bot ve saldırı koruması nedeniyle erişiminiz {minutes} dakika kısıtlandı.'
+        return render_template('login.html', error=error), 429
+
     if request.args.get('timeout'):
         error = 'Güvenlik gereği oturumunuz 5 dakika işlem yapılmadığı veya sekme kapatıldığı için sonlandırıldı. Lütfen tekrar şifre girin.'
 
@@ -149,6 +221,7 @@ def login():
 
         user = authenticate_user(username, password)
         if user:
+            clear_login_attempts(client_ip)  # Başarılı girişte sıfırla
             # Tarayıcı veya sekme kapandığında oturumun silinmesi için permanent=False
             session.permanent = False
             session['user'] = {
@@ -163,7 +236,15 @@ def login():
             next_url = request.args.get('next') or url_for('index')
             return redirect(next_url)
         else:
-            error = 'Kullanıcı adı veya şifre hatalı. Lütfen tekrar deneyin.'
+            record_failed_login(client_ip)
+            rem = is_ip_rate_limited(client_ip)
+            if rem > 0:
+                minutes = (rem // 60) + 1
+                error = f'Çok fazla hatalı giriş denemesi yapıldı! Hesabınız geçici olarak {minutes} dakika kilitlendi.'
+                return render_template('login.html', error=error), 429
+            else:
+                attempts_left = MAX_LOGIN_ATTEMPTS - len(_LOGIN_ATTEMPTS.get(client_ip, []))
+                error = f'Kullanıcı adı veya şifre hatalı. (Kalan deneme hakkı: {attempts_left})'
 
     return render_template('login.html', error=error)
 
@@ -611,8 +692,8 @@ def add_user_api():
     if not username or not password:
         return jsonify({'success': False, 'message': 'Kullanıcı adı ve şifre zorunludur.'}), 400
 
-    if len(password) < 4:
-        return jsonify({'success': False, 'message': 'Şifre en az 4 karakter olmalıdır.'}), 400
+    if len(password) < 8:
+        return jsonify({'success': False, 'message': 'Güçlü Parola Politikası: Şifre en az 8 karakter olmalıdır.'}), 400
 
     users = load_users()
     for u in users:
@@ -683,8 +764,8 @@ def admin_reset_password_api():
     if not target_username or not new_password:
         return jsonify({'success': False, 'message': 'Kullanıcı ve yeni şifre zorunludur.'}), 400
 
-    if len(new_password) < 4:
-        return jsonify({'success': False, 'message': 'Yeni şifre en az 4 karakter olmalıdır.'}), 400
+    if len(new_password) < 8:
+        return jsonify({'success': False, 'message': 'Güçlü Parola Politikası: Yeni şifre en az 8 karakter olmalıdır.'}), 400
 
     users = load_users()
     user_found = False
@@ -735,8 +816,8 @@ def change_password():
     if not old_password or not new_password:
         return jsonify({'success': False, 'message': 'Eski ve yeni şifre alanları zorunludur.'}), 400
 
-    if len(new_password) < 4:
-        return jsonify({'success': False, 'message': 'Yeni şifre en az 4 karakter olmalıdır.'}), 400
+    if len(new_password) < 8:
+        return jsonify({'success': False, 'message': 'Güçlü Parola Politikası: Yeni şifre en az 8 karakter olmalıdır.'}), 400
 
     current_username = session['user']['username']
     users = load_users()
@@ -913,7 +994,7 @@ def api_bridge_status():
     """Render tarafından bridge erişimini test eder."""
     import os as _os
     bridge_url = _os.environ.get('BRIDGE_URL', '').rstrip('/')
-    bridge_key = _os.environ.get('BRIDGE_API_KEY', 'nexlog_bridge_2026_secure_xKj9')
+    bridge_key = _os.environ.get('BRIDGE_API_KEY', '')
     
     status = {
         'bridge_url_configured': bool(bridge_url),
@@ -924,7 +1005,11 @@ def api_bridge_status():
     if bridge_url:
         # Health check
         try:
-            r = http_requests.get(f"{bridge_url}/bridge/health", timeout=10)
+            r = http_requests.get(
+                f"{bridge_url}/bridge/health",
+                headers={'ngrok-skip-browser-warning': 'true', 'User-Agent': 'NexlogBridgeClient/1.0'},
+                timeout=10
+            )
             status['health_check'] = r.json() if r.status_code == 200 else f"HTTP {r.status_code}"
         except Exception as e:
             status['health_check'] = f"BAĞLANAMADI: {str(e)}"
@@ -933,7 +1018,11 @@ def api_bridge_status():
         try:
             r2 = http_requests.get(
                 f"{bridge_url}/bridge/nakit/debug",
-                headers={'X-Bridge-Key': bridge_key},
+                headers={
+                    'X-Bridge-Key': bridge_key,
+                    'ngrok-skip-browser-warning': 'true',
+                    'User-Agent': 'NexlogBridgeClient/1.0'
+                },
                 timeout=30
             )
             status['nakit_debug'] = r2.json() if r2.status_code == 200 else f"HTTP {r2.status_code}"

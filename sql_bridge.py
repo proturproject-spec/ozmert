@@ -13,8 +13,8 @@ import pandas as pd
 
 bridge_app = Flask(__name__)
 
-# --- GÜVENLİK: API anahtarı ile sadece Render erişebilir ---
-BRIDGE_API_KEY = os.environ.get('BRIDGE_API_KEY', 'nexlog_bridge_2026_secure_xKj9')
+# --- GÜVENLİK: API anahtarı ortam değişkeninden alınır, kod içine yazılmaz ---
+BRIDGE_API_KEY = os.environ.get('BRIDGE_API_KEY', '')
 
 # --- SQL BAĞLANTI (db_config.json'dan oku) ---
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'db_config.json')
@@ -53,8 +53,10 @@ def get_engine_by_id(conn_id=1):
     return create_engine(f"mssql+pyodbc:///?odbc_connect={encoded}")
 
 def verify_key():
+    if not BRIDGE_API_KEY:
+        return False
     key = request.headers.get('X-Bridge-Key') or request.args.get('key')
-    return key == BRIDGE_API_KEY
+    return bool(key and key == BRIDGE_API_KEY)
 
 def df_to_json_safe(df):
     """DataFrame'i JSON-safe dict listesine çevirir (Timestamp, NaN sorunlarını çözer)."""
