@@ -726,6 +726,39 @@
                     </table>
                 </div>
             </div>
+
+            <!-- GİRİŞ GÜVENLİĞİ & KİLİT YÖNETİM KARTI -->
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
+                    <div>
+                        <h2 style="font-size: 1.2rem; margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                            </svg>
+                            Giriş Güvenliği & Kilit Yönetimi
+                        </h2>
+                        <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">5 dakika içinde 5 hatalı giriş yapan IP adresleri 15 dakika kilitlenir. Kilitleri buradan tek tıkla temizleyebilirsiniz.</p>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button type="button" class="btn btn-outline" style="padding: 0.45rem 0.85rem; font-size: 0.82rem;" onclick="loadActiveLockouts()">
+                            🔄 Durumu Yenile
+                        </button>
+                        <button type="button" class="btn" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); padding: 0.45rem 0.95rem; font-size: 0.82rem; display: flex; align-items: center; gap: 0.4rem; cursor: pointer;" onclick="handleClearAllLockouts()">
+                            🔓 Tüm Kilitleri Sıfırla
+                        </button>
+                    </div>
+                </div>
+
+                <div id="lockouts-container" style="background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border-color); border-radius: 0.6rem; padding: 1rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <span style="font-size: 0.88rem; color: var(--text-muted);">Aktif Kilit Durumu:</span>
+                        <span id="lockouts-summary-badge" style="font-size: 0.8rem; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); padding: 0.2rem 0.6rem; border-radius: 9999px; font-weight: 600;">
+                            ✅ Aktif Kilitli IP Bulunmuyor
+                        </span>
+                    </div>
+                    <div id="lockouts-list" style="margin-top: 0.85rem; display: none;"></div>
+                </div>
+            </div>
             {% endif %}
 
             <!-- KENDİ ŞİFRENİ DEĞİŞTİR KARTI -->
@@ -1388,6 +1421,99 @@
             showToast('Kullanıcı silinirken hata oluştu.', 'error');
         }
     }
+
+    // ============================================================
+    // GİRİŞ KİLİTLERİNİ YÖNETME VE TEMİZLEME
+    // ============================================================
+    async function loadActiveLockouts() {
+        const badge = document.getElementById('lockouts-summary-badge');
+        const listDiv = document.getElementById('lockouts-list');
+        if (!badge) return;
+
+        try {
+            const res = await fetch('/api/security/lockouts');
+            const data = await res.json();
+            if (data.success) {
+                const lockouts = data.lockouts || [];
+                if (lockouts.length === 0) {
+                    badge.style.background = 'rgba(16, 185, 129, 0.15)';
+                    badge.style.color = '#34d399';
+                    badge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+                    badge.innerText = '✅ Aktif Kilitli IP Bulunmuyor';
+                    if (listDiv) listDiv.style.display = 'none';
+                } else {
+                    badge.style.background = 'rgba(239, 68, 68, 0.2)';
+                    badge.style.color = '#f87171';
+                    badge.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+                    badge.innerText = `⚠️ ${lockouts.length} Adet IP Kilitli`;
+                    
+                    if (listDiv) {
+                        listDiv.style.display = 'block';
+                        listDiv.innerHTML = lockouts.map(item => `
+                            <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.04); padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 0.4rem; font-size: 0.83rem;">
+                                <div>
+                                    <strong style="color: #f87171;">${item.ip}</strong>
+                                    <span style="color: var(--text-muted); margin-left: 0.5rem;">(${item.remaining_minutes} dk kaldı, ${item.attempts} deneme)</span>
+                                </div>
+                                <button type="button" class="btn btn-outline" style="padding: 0.2rem 0.6rem; font-size: 0.75rem; color: #34d399; border-color: rgba(52, 211, 153, 0.4);" onclick="handleClearIpLockout('${item.ip}')">
+                                    Kilidi Aç
+                                </button>
+                            </div>
+                        `).join('');
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('Kilit bilgisi alınamadı:', err);
+        }
+    }
+
+    async function handleClearAllLockouts() {
+        if (!confirm('Tüm aktif giriş kilitlerini ve başarısız deneme sayaçlarını sıfırlamak istediğinize emin misiniz?')) {
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/security/clear-lockouts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast(data.message, 'success');
+                loadActiveLockouts();
+            } else {
+                showToast(data.message, 'error');
+            }
+        } catch (err) {
+            showToast('Kilitler sıfırlanırken hata oluştu.', 'error');
+        }
+    }
+
+    async function handleClearIpLockout(ip) {
+        try {
+            const res = await fetch('/api/security/clear-lockouts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ip })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast(data.message, 'success');
+                loadActiveLockouts();
+            } else {
+                showToast(data.message, 'error');
+            }
+        } catch (err) {
+            showToast('IP kilidi açılırken hata oluştu.', 'error');
+        }
+    }
+
+    // Sayfa açıldığında kilitleri yükle
+    document.addEventListener('DOMContentLoaded', () => {
+        loadActiveLockouts();
+    });
 
     // Toast Bildirim Fonksiyonu
     function showToast(message, type = 'info') {

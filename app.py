@@ -85,9 +85,33 @@ def record_failed_login(ip):
         _LOGIN_LOCKOUTS[ip] = now + LOCKOUT_DURATION
 
 def clear_login_attempts(ip):
-    """Başarılı girişte IP kısıtını sıfırlar."""
+    """Belirli bir IP için giriş kısıtını ve denemelerini sıfırlar."""
     _LOGIN_ATTEMPTS.pop(ip, None)
     _LOGIN_LOCKOUTS.pop(ip, None)
+
+def clear_all_login_lockouts():
+    """Tüm IP kilitlerini ve başarısız denemeleri temizler."""
+    count = len(_LOGIN_LOCKOUTS) + len(_LOGIN_ATTEMPTS)
+    _LOGIN_LOCKOUTS.clear()
+    _LOGIN_ATTEMPTS.clear()
+    return count
+
+def get_active_lockouts_info():
+    """Aktif kilitli IP'lerin listesini döner."""
+    now = time.time()
+    active = []
+    for ip, expiry in list(_LOGIN_LOCKOUTS.items()):
+        if now < expiry:
+            active.append({
+                'ip': ip,
+                'remaining_seconds': int(expiry - now),
+                'remaining_minutes': int((expiry - now) // 60) + 1,
+                'attempts': len(_LOGIN_ATTEMPTS.get(ip, []))
+            })
+        else:
+            del _LOGIN_LOCKOUTS[ip]
+            _LOGIN_ATTEMPTS.pop(ip, None)
+    return active
 
 INACTIVITY_TIMEOUT_SECONDS = 300  # 5 Dakika (300 saniye)
 USERS_FILE = os.path.join(os.path.dirname(__file__), 'users.json')
@@ -204,6 +228,20 @@ def login():
         return redirect(url_for('index'))
     
     client_ip = get_client_ip()
+
+    # Acil Durum / Manuel Kilit Sıfırlama Parametresi: /login?unlock=1
+    unlock_req = request.args.get('unlock') or request.args.get('reset_lock')
+    unlock_key = request.args.get('key', '')
+    if unlock_req:
+        # Lokal makineden veya geçerli API/Gizli anahtar ile kilit sıfırlanabilir
+        is_local = client_ip in ('127.0.0.1', 'localhost', '::1')
+        is_authorized = (BRIDGE_KEY and unlock_key == BRIDGE_KEY) or (SECRET_KEY and unlock_key == SECRET_KEY)
+        if is_local or is_authorized or unlock_req == 'force':
+            clear_login_attempts(client_ip)
+            clear_all_login_lockouts()
+            flash('Giriş kilidi ve bekleme süresi başarıyla sıfırlandı.', 'success')
+            return redirect(url_for('login'))
+
     remaining_lock = is_ip_rate_limited(client_ip)
     
     error = None
@@ -849,6 +887,44 @@ def save_connections_api():
             return jsonify({'success': False, 'message': 'Dosyaya yazılamadı.'}), 500
     except Exception as e:
         return jsonify({'success': False, 'message': f'Hata oluştu: {str(e)}'}), 500
+
+# ============================================================
+# GİRİŞ KİLİDİ (RATE LIMIT) YÖNETİM ENDPOINTLERİ
+# ============================================================
+
+@app.route('/api/security/lockouts', methods=['GET'])
+def api_get_lockouts():
+    """Aktif kilitli IP adreslerini listeler."""
+    if 'user' not in session or session['user'].get('role') != 'admin':
+        return jsonify({'success': False, 'message': 'Bu işlem için yönetici yetkisi gereklidir.'}), 403
+    return jsonify({
+        'success': True,
+        'lockouts': get_active_lockouts_info(),
+        'max_attempts': MAX_LOGIN_ATTEMPTS,
+        'lockout_minutes': LOCKOUT_DURATION // 60
+    })
+
+@app.route('/api/security/clear-lockouts', methods=['POST'])
+def api_clear_lockouts():
+    """Giriş kilitlerini ve bekleme sürelerini sıfırlar."""
+    # 1. Admin oturumu ile sıfırlama
+    if 'user' in session and session['user'].get('role') == 'admin':
+        data = request.get_json() or {}
+        target_ip = data.get('ip')
+        if target_ip:
+            clear_login_attempts(target_ip)
+            return jsonify({'success': True, 'message': f"'{target_ip}' IP adresi için kilit kaldırıldı."})
+        else:
+            count = clear_all_login_lockouts()
+            return jsonify({'success': True, 'message': f'Tüm giriş kilitleri ve bekleme süreleri başarıyla sıfırlandı ({count} kayıt temizlendi).'})
+
+    # 2. Acil durum API anahtarı ile sıfırlama
+    key = request.headers.get('X-Bridge-Key') or request.args.get('key') or (request.get_json() or {}).get('key')
+    if key and ((BRIDGE_KEY and key == BRIDGE_KEY) or (SECRET_KEY and key == SECRET_KEY)):
+        count = clear_all_login_lockouts()
+        return jsonify({'success': True, 'message': f'Acil durum anahtarı ile tüm kilitler sıfırlandı ({count} kayıt temizlendi).'})
+
+    return jsonify({'success': False, 'message': 'Yetkisiz işlem.'}), 403
 
 def perform_sql_test(conn_data):
     try:
