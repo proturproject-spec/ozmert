@@ -343,12 +343,21 @@
             --accent-rose: #f87171;
         }
 
+        html, body {
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+
         body {
             background: var(--bg-color);
             font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
             color: var(--text-main);
             min-height: 100vh;
-            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
         }
 
         .portal-header {
@@ -359,6 +368,8 @@
             top: 0;
             z-index: 1000;
             width: 100%;
+            display: flex;
+            justify-content: center;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
         .portal-header .portal-logo {
@@ -538,6 +549,9 @@
             position: sticky;
             top: 53px;
             z-index: 100;
+            width: 100%;
+            display: flex;
+            justify-content: center;
         }
         .top-bar .container-xl {
             display: flex;
@@ -734,15 +748,54 @@
             border-color: var(--accent-hover);
             transform: translateY(-1px);
         }
-        /* ── MAIN LAYOUT ── */
-        .main-content { padding: 1.5rem 0 3rem; width: 100%; }
-        .container-xl { max-width: 1720px; width: 100%; margin-left: auto !important; margin-right: auto !important; padding-left: 1.5rem; padding-right: 1.5rem; box-sizing: border-box; }
+        /* ── MAIN LAYOUT & CENTERING ── */
+        .main-content { 
+            padding: 1.5rem 0 3rem; 
+            width: 100%; 
+            flex: 1;
+            display: flex;
+            justify-content: center;
+        }
+        .container-xl { 
+            max-width: 1540px; 
+            width: 100%; 
+            margin: 0 auto !important; 
+            padding-left: 1.5rem; 
+            padding-right: 1.5rem; 
+            box-sizing: border-box; 
+        }
+        .daily-layout-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            align-items: start;
+            width: 100%;
+        }
+        @media (max-width: 1200px) {
+            .daily-layout-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .daily-col-left, .daily-col-right {
+            min-width: 0;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+        .main-tabs-container {
+            display: flex;
+            gap: 0.4rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
         /* ── 3-KPI SUMMARY BAR ── */
         .kpi-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 1.25rem;
             margin-bottom: 2rem;
+            width: 100%;
         }
         @media (max-width: 768px) {
             .kpi-grid { grid-template-columns: 1fr; }
@@ -2051,6 +2104,9 @@
             border: 1px solid #d4d4d4;
             color: #000000;
             font-family: 'Segoe UI', Calibri, sans-serif;
+            width: 100%;
+            overflow-x: auto;
+            box-sizing: border-box;
         }
         .excel-sheet-wrapper h3 {
             color: #000000;
@@ -2419,6 +2475,9 @@
             padding: 1.5rem;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
             margin-bottom: 2.5rem;
+            width: 100%;
+            overflow-x: auto;
+            box-sizing: border-box;
         }
         .flow-header-card {
             background: rgba(59, 130, 246, 0.05);
