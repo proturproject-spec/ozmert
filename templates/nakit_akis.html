@@ -451,6 +451,59 @@
             color: #fef08a;
         }
 
+        /* Paid custom payment styling - Overwrite overdue/today styles and apply clear strikethrough */
+        .data-table tbody tr.payment-row-paid,
+        [data-theme="light-modern"] .data-table tbody tr.payment-row-paid {
+            background: rgba(148, 163, 184, 0.08) !important;
+            opacity: 0.55 !important;
+            filter: grayscale(0.6);
+            transition: all 0.2s ease;
+        }
+        .data-table tbody tr.payment-row-paid td,
+        .data-table tbody tr.payment-row-paid td:first-child,
+        [data-theme="light-modern"] .data-table tbody tr.payment-row-paid td {
+            color: #94a3b8 !important;
+            border-left-color: #94a3b8 !important;
+        }
+        /* Strikethrough on all payment text cells, labels, amounts and dates */
+        .data-table tbody tr.payment-row-paid td.cell-name,
+        .data-table tbody tr.payment-row-paid td.cell-amount,
+        .data-table tbody tr.payment-row-paid td .cell-date,
+        .data-table tbody tr.payment-row-paid td .custom-badge,
+        .data-table tbody tr.payment-row-paid td:nth-child(2),
+        .data-table tbody tr.payment-row-paid td:nth-child(3),
+        .data-table tbody tr.payment-row-paid td:nth-child(4),
+        .data-table tbody tr.payment-row-paid td:nth-child(5) {
+            text-decoration: line-through !important;
+            text-decoration-color: #ef4444 !important;
+            text-decoration-thickness: 2px !important;
+            color: #94a3b8 !important;
+        }
+        .data-table tbody tr.payment-row-paid .cell-amount {
+            color: #94a3b8 !important;
+            text-decoration: line-through !important;
+            text-decoration-color: #ef4444 !important;
+            text-decoration-thickness: 2px !important;
+        }
+        .data-table tbody tr.payment-row-paid .custom-badge {
+            text-decoration: line-through !important;
+            text-decoration-color: #ef4444 !important;
+            opacity: 0.6 !important;
+            border-color: #94a3b8 !important;
+            background: #f1f5f9 !important;
+            color: #64748b !important;
+        }
+        .data-table tbody tr.payment-row-paid td:has(input), 
+        .data-table tbody tr.payment-row-paid td:has(button), 
+        .data-table tbody tr.payment-row-paid td:has(a),
+        .data-table tbody tr.payment-row-paid td:nth-child(1),
+        .data-table tbody tr.payment-row-paid td:nth-child(6),
+        .data-table tbody tr.payment-row-paid td:nth-child(7),
+        .data-table tbody tr.payment-row-paid td:nth-child(8) {
+            text-decoration: none !important;
+            opacity: 1 !important;
+        }
+
         /* Negative Bank Balance Highlight with dynamic premium red flashing/pulsating effect */
         @keyframes negative-blink {
             0%, 100% {
@@ -2347,8 +2400,11 @@
                                         <th style="width: 100px;">Kategori</th>
                                         <th>Açıklama</th>
                                         <th style="width: 90px;">Vade</th>
+                                        <th style="width: 55px; text-align: center; color: #38bdf8; font-weight: 800;" title="Kredi Kartı Ödemesi (KK)">
+                                            <i class="bi bi-credit-card-2-front-fill"></i> KK
+                                        </th>
                                         <th class="text-end" style="width: 100px;">Tutar</th>
-                                        <th style="width: 80px; text-align: center;">Kredi Kartı</th>
+                                        <th style="width: 60px; text-align: center;">Ödendi</th>
                                         <th style="width: 70px; text-align: center;">İşlem</th>
                                     </tr>
                                 </thead>
@@ -2365,7 +2421,7 @@
                                         {% elif cat == 'Navlun' %}{% set color_class = 'navlun' %}
                                         {% elif cat == 'Kredi Kartı' %}{% set color_class = 'kredikarti' %}
                                         {% else %}{% set color_class = 'diger' %}{% endif %}
-                                    <tr class="{% if r.is_late %}row-today-late{% elif r.kalan_gun < 0 %}row-overdue{% elif r.kalan_gun == 0 %}row-today{% endif %}" data-row-category="{{ r.category }}">
+                                    <tr class="{% if r.odendi %}payment-row-paid{% endif %} {% if r.is_late %}row-today-late{% elif r.kalan_gun < 0 %}row-overdue{% elif r.kalan_gun == 0 %}row-today{% endif %}" data-row-category="{{ r.category }}">
                                         <td style="text-align: center;">
                                             <input type="checkbox" class="payment-checkbox" value="{{ r.index }}" onchange="updateBulkDeleteUI()">
                                         </td>
@@ -2378,11 +2434,12 @@
                                                 {{ r.date.strftime('%d.%m.%Y') }}
                                             </div>
                                         </td>
+                                        <td style="text-align: center; vertical-align: middle;">
+                                            <input type="checkbox" {% if r.credit_card_pay %}checked{% endif %} onchange="toggleCreditCardPayment({{ r.index }}, this)" class="payment-cc-checkbox" style="cursor: pointer; width: 18px; height: 18px; accent-color: #38bdf8; margin: 0 auto; display: block;" title="Kredi Kartı (KK) olarak işaretle / kaldır (Kredi kartı toplamına dahil edilir)">
+                                        </td>
                                         <td class="text-end cell-amount blue" style="font-size: 0.8rem;">{{ r.amount | format_currency }} ₺</td>
                                         <td style="text-align: center;">
-                                            <a href="{{ url_for('toggle_credit_card_payment_route', idx=r.index, target_date=selected_date) }}" class="cc-toggle-btn {% if r.credit_card_pay %}active{% endif %}" title="Kredi Kartı Ödemesi Olarak İşaretle/Kaldır">
-                                                <i class="bi bi-check-lg" style="font-weight: 800;"></i>
-                                            </a>
+                                            <input type="checkbox" {% if r.odendi %}checked{% endif %} onchange="togglePaymentPaid({{ r.index }}, this)" style="cursor: pointer; transform: scale(1.25); accent-color: #10b981;" title="Ödendi olarak işaretle / kaldır (Ödenince üzeri tek çizgi ile çizilir)">
                                         </td>
                                         <td style="text-align: center; white-space: nowrap;">
                                             <button type="button" class="btn-edit-row" 
@@ -2392,6 +2449,7 @@
                                                     data-explanation="{{ r.explanation }}"
                                                     data-amount="{{ r.amount }}"
                                                     data-credit-card-pay="{{ 'true' if r.credit_card_pay else 'false' }}"
+                                                    data-odendi="{{ 'true' if r.odendi else 'false' }}"
                                                     onclick="initiateEdit(this)"
                                                     title="Düzenle"
                                                     style="padding: 0.25rem 0.4rem; font-size: 0.75rem;">
@@ -4105,9 +4163,62 @@
             alert('Lütfen en az bir ay seçiniz.');
             return;
         }
-        sessionStorage.setItem('activeMainTab', 'summary-tab');
-        const targetDate = '{{ selected_date }}';
         window.location.href = `{{ url_for('dashboard') }}?target_date=${targetDate}&selected_months=${checked.join(',')}`;
+    }
+
+    function togglePaymentPaid(idx, checkbox) {
+        const row = checkbox.closest('tr');
+        if (row) {
+            if (checkbox.checked) {
+                row.classList.add('payment-row-paid');
+            } else {
+                row.classList.remove('payment-row-paid');
+            }
+        }
+        fetch(`/toggle_payment_paid/${idx}`, {
+            method: 'POST'
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Hata: ' + data.error);
+                checkbox.checked = !checkbox.checked; // Revert
+                if (row) {
+                    if (checkbox.checked) {
+                        row.classList.add('payment-row-paid');
+                    } else {
+                        row.classList.remove('payment-row-paid');
+                    }
+                }
+            }
+        })
+        .catch(err => {
+            console.error("Paid toggle error:", err);
+            alert('Durum güncellenirken hata oluştu.');
+            checkbox.checked = !checkbox.checked; // Revert
+            if (row) {
+                if (checkbox.checked) {
+                    row.classList.add('payment-row-paid');
+                } else {
+                    row.classList.remove('payment-row-paid');
+                }
+            }
+        });
+    }
+    function toggleCreditCardPayment(idx, checkbox) {
+        fetch(`/toggle_credit_card_payment/${idx}`, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(res => {
+            location.reload();
+        })
+        .catch(err => {
+            console.error("KK toggle error:", err);
+            location.reload();
+        });
     }
 </script>
 

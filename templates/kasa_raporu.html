@@ -1,0 +1,490 @@
+{% extends "base.html" %}
+
+{% block title %}Kasa Raporu - Bakiye Durumu{% endblock %}
+
+{% block content %}
+<style>
+    main {
+        max-width: 100% !important;
+        width: 100% !important;
+        padding: 0.85rem 1.25rem !important;
+        margin: 0 auto !important;
+    }
+
+    #kasa-rapor-table {
+        width: 100% !important;
+        table-layout: fixed !important;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+    #kasa-rapor-table th {
+        font-size: 0.82rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        background: var(--card-bg-subtle);
+        border-bottom: 2px solid var(--border-color);
+        color: var(--text-muted);
+        white-space: nowrap !important;
+        padding: 0.75rem 0.6rem;
+    }
+
+    #kasa-rapor-table td {
+        font-size: 0.86rem;
+        vertical-align: middle;
+        border-bottom: 1px solid var(--border-color);
+        color: var(--text-main);
+        padding: 0.55rem 0.6rem;
+    }
+
+    #kasa-rapor-table tbody tr {
+        min-height: 42px;
+        transition: background-color 0.12s ease;
+    }
+
+    #kasa-rapor-table tbody tr:nth-child(even) {
+        background-color: var(--table-stripe);
+    }
+
+    #kasa-rapor-table tbody tr:hover {
+        background-color: var(--table-hover) !important;
+    }
+
+    /* Döviz cinslerinin aşağı satıra kaymasını kesin olarak engelleyen sınıf */
+    .num-cell {
+        font-family: 'Consolas', monospace;
+        font-variant-numeric: tabular-nums;
+        font-size: 0.88rem;
+        font-weight: 700;
+        white-space: nowrap !important;
+    }
+
+    .btn-hareketler {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-size: 0.82rem;
+        font-weight: 600;
+        padding: 4px 10px;
+        border-radius: 6px;
+        background: var(--accent-light);
+        color: var(--accent);
+        border: 1px solid var(--border-color);
+        text-decoration: none;
+        transition: all 0.15s ease;
+        white-space: nowrap !important;
+    }
+
+    .btn-hareketler:hover {
+        background: var(--accent);
+        color: #ffffff;
+        box-shadow: 0 2px 8px rgba(14, 165, 233, 0.4);
+    }
+
+    /* Yanıp Sönme (Blinking) Efekti - Eksi Bakiye Satırları İçin */
+    @keyframes redBlinkPulse {
+        0% {
+            background-color: rgba(239, 68, 68, 0.18);
+            color: #f87171;
+            box-shadow: inset 0 0 12px rgba(239, 68, 68, 0.3);
+        }
+        50% {
+            background-color: rgba(239, 68, 68, 0.75);
+            color: #ffffff;
+            box-shadow: inset 0 0 25px rgba(239, 68, 68, 0.9);
+        }
+        100% {
+            background-color: rgba(239, 68, 68, 0.18);
+            color: #f87171;
+            box-shadow: inset 0 0 12px rgba(239, 68, 68, 0.3);
+        }
+    }
+
+    .row-negative-blink {
+        animation: redBlinkPulse 1.2s infinite ease-in-out !important;
+        border-left: 6px solid #ef4444 !important;
+        font-weight: 700 !important;
+    }
+
+    .row-negative-blink td {
+        color: inherit !important;
+        border-bottom: 1px solid rgba(239, 68, 68, 0.4) !important;
+    }
+
+    .row-negative-blink .bakiye-val {
+        color: #ffffff !important;
+        text-shadow: 0 0 8px rgba(0, 0, 0, 0.8);
+        font-size: 0.95rem !important;
+    }
+
+    .badge-alarm {
+        background: #ef4444;
+        color: #ffffff;
+        padding: 3px 8px;
+        border-radius: 6px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        animation: redBlinkPulse 1s infinite;
+        box-shadow: 0 0 12px rgba(239, 68, 68, 0.6);
+    }
+
+    @keyframes pulseDot {
+        0% { transform: scale(0.9); opacity: 0.6; }
+        50% { transform: scale(1.3); opacity: 1; }
+        100% { transform: scale(0.9); opacity: 0.6; }
+    }
+</style>
+
+<div style="display: flex; flex-direction: column; gap: 1.25rem;">
+    <!-- Üst Başlık & Aksiyonlar -->
+    <!-- Üst Başlık & Toplam Bakiye & Aksiyonlar -->
+    <div class="card" style="padding: 0.9rem 1.25rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+            <!-- Sol: Başlık & Breadcrumb -->
+            <div style="display: flex; align-items: center; gap: 0.85rem;">
+                <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.4)); border: 1px solid rgba(16, 185, 129, 0.4); width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+                    💰
+                </div>
+                <div>
+                    <div style="display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.15rem;">
+                        <a href="/finans" style="color: var(--text-muted); font-size: 0.8rem; text-decoration: none;">Finans</a>
+                        <span style="color: var(--text-muted); font-size: 0.7rem;">/</span>
+                        <span style="color: var(--text-muted); font-size: 0.8rem;">Kasa</span>
+                        <span style="color: var(--text-muted); font-size: 0.7rem;">/</span>
+                        <span style="color: var(--accent); font-size: 0.8rem; font-weight: 500;">Kasa Raporu</span>
+                        <span class="status-badge ok" style="font-size: 0.7rem; padding: 1px 7px; margin-left: 0.4rem;">
+                            ● Canlı SQL Bakiyeleri
+                        </span>
+                    </div>
+                    <h1 style="font-size: 1.35rem; margin: 0; font-weight: 700; color: var(--text-main); letter-spacing: -0.02em;">Kasa Bakiye Raporu</h1>
+                </div>
+            </div>
+
+            <!-- Orta/Sağ: TOPLAM KASA BAKİYESİ (Yukarı taşınan bölüm) -->
+            <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-left: 4px solid #10b981; border-radius: 8px; padding: 0.4rem 1.1rem; display: flex; flex-direction: column; justify-content: center;">
+                <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.35rem; margin-bottom: 0.1rem;">
+                    💵 Toplam Kasa Bakiyesi
+                </div>
+                <div id="stat-total-bakiye" style="font-size: 1.45rem; font-weight: 800; color: #34d399; font-family: 'Consolas', monospace; font-variant-numeric: tabular-nums; white-space: nowrap !important; line-height: 1.2;">
+                    0,00 {{ active_currency or 'DZD' }}
+                </div>
+            </div>
+
+            <!-- Sağ: Aksiyon Butonları -->
+            <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
+                <a href="/kasa-hareketleri" class="btn" style="background: var(--card-bg-subtle); border: 1px solid var(--border-color); color: var(--text-main); font-size: 0.82rem; padding: 0.45rem 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 0.35rem;">
+                    📋 1. Kasa Hareketleri
+                </a>
+                <a href="/finans/kasa-analizi" class="btn" style="background: var(--card-bg-subtle); border: 1px solid var(--border-color); color: var(--text-main); font-size: 0.82rem; padding: 0.45rem 0.85rem; text-decoration: none; display: flex; align-items: center; gap: 0.35rem;">
+                    📈 3. Kasa Analizi
+                </a>
+                <button type="button" class="btn" onclick="exportKasaRaporuExcel()" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.82rem; padding: 0.45rem 0.85rem; display: flex; align-items: center; gap: 0.35rem;">
+                    📥 Excel İndir
+                </button>
+                <button type="button" class="btn" onclick="loadKasaRaporuData()" style="background: var(--accent); color: #fff; font-size: 0.82rem; padding: 0.45rem 0.85rem; display: flex; align-items: center; gap: 0.35rem;">
+                    🔄 Yenile
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Kasa Raporu Tablosu -->
+    <div class="card" style="padding: 0; overflow: hidden;">
+        <div style="padding: 0.85rem 1.25rem; background: var(--card-bg-subtle); border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+            <div style="font-size: 0.9rem; font-weight: 600; color: var(--text-main); display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                <span>📋 Kasa Bakiyeleri Listesi (<span id="table-kasa-count">0</span> kasa)</span>
+                <span id="auto-refresh-badge" style="font-size: 0.72rem; font-weight: 600; padding: 2px 8px; border-radius: 6px; background: rgba(59, 130, 246, 0.12); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); display: inline-flex; align-items: center; gap: 0.35rem;" title="Filtreler bozulmadan her 1 dakikada bir otomatik güncellenir">
+                    <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #3b82f6; animation: pulseDot 2s infinite;"></span>
+                    1 dk Otomatik Yenileme Aktif
+                </span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <div id="alarm-banner" style="display: none; align-items: center; gap: 0.4rem; font-size: 0.8rem; font-weight: 700; color: #ef4444; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.25rem 0.6rem; border-radius: 6px;">
+                    ⚠️ Eksi bakiyeli kasalar mevcut
+                </div>
+                <span id="last-refresh-time" style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace;"></span>
+                <div id="loading-indicator" style="display: none; font-size: 0.85rem; color: var(--accent); align-items: center; gap: 0.4rem;">
+                    ⏳ Hesaplanıyor...
+                </div>
+            </div>
+        </div>
+
+        <div style="width: 100%; overflow-x: hidden;">
+            <table class="table" id="kasa-rapor-table">
+                <colgroup>
+                    <col style="width: 10%;">  <!-- KODU -->
+                    <col style="width: 32%;">  <!-- KASA ADI -->
+                    <col style="width: 18%;">  <!-- GİREN (BORÇ) -->
+                    <col style="width: 18%;">  <!-- ÇIKAN (ALACAK) -->
+                    <col style="width: 14%;">  <!-- BAKİYE -->
+                    <col style="width: 8%;">   <!-- İŞLEMLER -->
+                </colgroup>
+                <thead style="position: sticky; top: 0; z-index: 2;">
+                    <tr>
+                        <th style="padding: 0.65rem 1rem; text-align: left;">KODU</th>
+                        <th style="padding: 0.65rem 1rem; text-align: left;">KASA ADI</th>
+                        <th style="padding: 0.65rem 1rem; text-align: right;">GİREN (BORÇ)</th>
+                        <th style="padding: 0.65rem 1rem; text-align: right;">ÇIKAN (ALACAK)</th>
+                        <th style="padding: 0.65rem 1rem; text-align: right;">BAKİYE</th>
+                        <th style="padding: 0.65rem 1rem; text-align: center;">İŞLEMLER</th>
+                    </tr>
+                </thead>
+                <tbody id="kasa-rapor-tbody">
+                    <tr>
+                        <td colspan="6" style="padding: 3rem; text-align: center; color: var(--text-muted);">
+                            ⏳ Kasa verileri yükleniyor, lütfen bekleyiniz...
+                        </td>
+                    </tr>
+                </tbody>
+                <!-- Toplam Satırı (Döviz cinsi asla aşağı kaymaz) -->
+                <tfoot id="kasa-rapor-tfoot" style="background: var(--card-bg-subtle); border-top: 2px solid var(--border-color); font-weight: 800;">
+                    <tr>
+                        <td colspan="2" style="padding: 0.85rem 1rem; font-size: 0.88rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-main); font-weight: 800;">
+                            GENEL TOPLAM
+                        </td>
+                        <td id="foot-total-giren" class="num-cell" style="padding: 0.85rem 1rem; text-align: right; font-size: 0.95rem; font-weight: 800; color: #38bdf8; white-space: nowrap !important;">
+                            0,00 {{ active_currency or 'DZD' }}
+                        </td>
+                        <td id="foot-total-cikan" class="num-cell" style="padding: 0.85rem 1rem; text-align: right; font-size: 0.95rem; font-weight: 800; color: #fb7185; white-space: nowrap !important;">
+                            0,00 {{ active_currency or 'DZD' }}
+                        </td>
+                        <td id="foot-total-bakiye" class="num-cell" style="padding: 0.85rem 1rem; text-align: right; font-size: 1.02rem; font-weight: 900; color: #34d399; white-space: nowrap !important;">
+                            0,00 {{ active_currency or 'DZD' }}
+                        </td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    <!-- 📊 Kasa Analizi Kartı -->
+    <div class="card" id="kasa-analizi-card" style="padding: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.25rem; padding-bottom: 0.85rem; border-bottom: 1px solid var(--border-color);">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(37, 99, 235, 0.4)); border: 1px solid rgba(59, 130, 246, 0.4); width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+                    📊
+                </div>
+                <div>
+                    <h2 style="font-size: 1.2rem; margin: 0; font-weight: 700; color: var(--text-main); letter-spacing: -0.02em;">Kasa Analizi</h2>
+                    <p style="font-size: 0.84rem; margin: 0; color: var(--text-muted);">
+                        Kasaların dönemsel akış, oran ve karşılaştırmalı analizleri.
+                    </p>
+                </div>
+            </div>
+            <span class="status-badge" style="font-size: 0.75rem; padding: 3px 10px; border-radius: 6px; background: var(--card-bg-subtle); color: var(--accent); border: 1px solid var(--border-color); font-weight: 600;">
+                ● İçerik Alanı Hazır
+            </span>
+        </div>
+
+        <div id="kasa-analizi-content" style="padding: 2.5rem 1.5rem; text-align: center; border: 2px dashed var(--border-color); border-radius: 10px; background: var(--card-bg-subtle);">
+            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📈</div>
+            <div style="font-size: 1.1rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.35rem;">
+                Ticari İşlem Grubu 12 Aylık Analiz Tablosu Hazır
+            </div>
+            <div style="font-size: 0.86rem; color: var(--text-muted); max-width: 540px; margin: 0 auto 1.25rem auto; line-height: 1.5;">
+                Kasaların Ocak - Aralık ayları arasındaki tüm hareketlerini Ticari İşlem Grubu bazında konsolide matris olarak inceleyebilirsiniz.
+            </div>
+            <a href="/finans/kasa-analizi" class="btn" style="background: var(--accent); color: #fff; font-size: 0.86rem; padding: 0.55rem 1.35rem; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 0.45rem;">
+                📈 Kasa Analizi Tablosuna Git →
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentCurrency = '{{ active_currency or "DZD" }}';
+
+    // HTML Kaçış Fonksiyonu
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    // Para birimi formatlama (Örn: 1.234.567,89 DZD - Tek satırda)
+    function formatMoney(amount, curr) {
+        const c = curr || currentCurrency;
+        if (amount === null || amount === undefined || isNaN(amount)) return '0,00 ' + c;
+        return Number(amount).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + c;
+    }
+
+    function getRaporFilterParams() {
+        return {
+            start_date: '',
+            end_date: '',
+            search: ''
+        };
+    }
+
+    // API'den Kasa Bakiye Verilerini Yükle (Filtreleri aynen korur)
+    async function loadKasaRaporuData(isAutoRefresh = false) {
+        const loading = document.getElementById('loading-indicator');
+        const tbody = document.getElementById('kasa-rapor-tbody');
+        const alarmBanner = document.getElementById('alarm-banner');
+        
+        // Otomatik periyodik yenilemede kullanıcıyı sarsmadan sessizce güncelle
+        if (!isAutoRefresh) {
+            loading.style.display = 'inline-flex';
+        }
+
+        // Filtre formundaki mevcut değerler (başlangıç, bitiş, arama) bozulmadan okunur
+        const params = getRaporFilterParams();
+
+        try {
+            const resp = await fetch('/api/kasa-raporu/data', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(params)
+            });
+
+            const data = await resp.json();
+
+            if (data.success) {
+                const summary = data.summary;
+                if (summary && summary.currency) {
+                    currentCurrency = summary.currency;
+                }
+
+                // Kasa Sayısı Rozeti Güncellemesi (0 Kasa hatasını çözer)
+                const totalKasaCount = (data.records ? data.records.length : 0);
+                document.getElementById('table-kasa-count').innerText = totalKasaCount.toLocaleString('tr-TR');
+
+                // Son güncelleme zamanı
+                const timeEl = document.getElementById('last-refresh-time');
+                if (timeEl) {
+                    timeEl.innerText = 'Son: ' + new Date().toLocaleTimeString('tr-TR');
+                }
+
+                // Toplam Kasa Bakiyesini Güncelle (Yukarı taşındı)
+                const statBakiye = document.getElementById('stat-total-bakiye');
+                if (statBakiye) {
+                    statBakiye.innerText = formatMoney(summary.total_bakiye, currentCurrency);
+                    statBakiye.style.color = summary.total_bakiye < 0 ? '#ef4444' : '#34d399';
+                }
+
+                // Eksi Bakiye Alarm Durumu (Tablo başlığındaki alarm banner'ı)
+                const negCount = summary.negative_count || 0;
+                if (alarmBanner) {
+                    alarmBanner.style.display = negCount > 0 ? 'inline-flex' : 'none';
+                }
+
+                // Alt Toplam Satırı (Tek satır, asla kaymaz)
+                document.getElementById('foot-total-giren').innerText = formatMoney(summary.total_giren, currentCurrency);
+                document.getElementById('foot-total-cikan').innerText = formatMoney(summary.total_cikan, currentCurrency);
+                const footBakiye = document.getElementById('foot-total-bakiye');
+                footBakiye.innerText = formatMoney(summary.total_bakiye, currentCurrency);
+                footBakiye.style.color = summary.total_bakiye < 0 ? '#ef4444' : '#34d399';
+
+                // Tablo Satırlarını Oluştur
+                if (!data.records || data.records.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="6" style="padding: 3rem; text-align: center; color: var(--text-muted);">
+                                📭 Kayıtlı kasa bulunamadı.
+                            </td>
+                        </tr>
+                    `;
+                } else {
+                    let html = '';
+                    data.records.forEach(r => {
+                        const giren = Number(r['GİREN'] || 0);
+                        const cikan = Number(r['ÇIKAN'] || 0);
+                        const bakiye = Number(r['BAKİYE'] || 0);
+                        const isNegative = bakiye < 0;
+                        const rowCurr = r['PARA BİRİMİ'] || currentCurrency;
+
+                        const rowClass = isNegative ? 'row-negative-blink' : '';
+                        const bakiyeColor = isNegative ? '#ef4444' : (bakiye > 0 ? '#34d399' : 'var(--text-muted)');
+
+                        html += `
+                            <tr class="${rowClass}">
+                                <td style="padding: 0.65rem 1rem; font-family: 'Consolas', monospace; font-weight: 700; color: var(--accent); white-space: nowrap !important;">
+                                    ${escapeHtml(r['KODU'])}
+                                </td>
+                                <td style="padding: 0.65rem 1rem; font-weight: 600;">
+                                    ${escapeHtml(r['KASA ADI'])}
+                                    ${isNegative ? '<span class="badge-alarm" style="margin-left: 0.5rem;">⚠️ EKSİ BAKİYE</span>' : ''}
+                                </td>
+                                <td class="num-cell" style="padding: 0.65rem 1rem; text-align: right; font-weight: 600; color: #38bdf8; white-space: nowrap !important;">
+                                    ${formatMoney(giren, rowCurr)}
+                                </td>
+                                <td class="num-cell" style="padding: 0.65rem 1rem; text-align: right; font-weight: 600; color: #fb7185; white-space: nowrap !important;">
+                                    ${formatMoney(cikan, rowCurr)}
+                                </td>
+                                <td class="num-cell bakiye-val" style="padding: 0.65rem 1rem; text-align: right; font-weight: 800; color: ${bakiyeColor}; white-space: nowrap !important;">
+                                    ${formatMoney(bakiye, rowCurr)}
+                                </td>
+                                <td style="padding: 0.65rem 1rem; text-align: center; white-space: nowrap !important;">
+                                    <a href="/kasa-hareketleri?kasa_kodu=${encodeURIComponent(r['KODU'])}" class="btn-hareketler" title="${escapeHtml(r['KASA ADI'])} Hareket Detayları">
+                                        Hareketler →
+                                    </a>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                    tbody.innerHTML = html;
+                }
+            } else {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" style="padding: 2rem; text-align: center; color: #f87171;">
+                            ⚠️ Hata: ${data.message || 'Bakiyeler alınırken bir sorun oluştu.'}
+                        </td>
+                    </tr>
+                `;
+            }
+        } catch (e) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" style="padding: 2rem; text-align: center; color: #f87171;">
+                        ⚠️ Bağlantı hatası: ${e.message}
+                    </td>
+                </tr>
+            `;
+        } finally {
+            loading.style.display = 'none';
+        }
+    }
+
+    // Excel İndir
+    function exportKasaRaporuExcel() {
+        const p = getRaporFilterParams();
+        const url = `/api/kasa-raporu/export?start_date=${encodeURIComponent(p.start_date)}&end_date=${encodeURIComponent(p.end_date)}&search=${encodeURIComponent(p.search)}`;
+        window.location.href = url;
+    }
+
+    // 1 Dakikalık Otomatik Yenileme (Filtreler Bozulmadan)
+    let raporAutoRefreshTimer = null;
+    function initRaporAutoRefresh() {
+        if (raporAutoRefreshTimer) clearInterval(raporAutoRefreshTimer);
+        raporAutoRefreshTimer = setInterval(() => {
+            // Ekran açıkken ve sekme aktifken her 1 dakikada bir (60 saniye) verileri sessizce tazele
+            if (!document.hidden) {
+                loadKasaRaporuData(true);
+            }
+        }, 60000);
+    }
+
+    // Tarayıcı sekmesine dönüldüğünde hemen tazele
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+            loadKasaRaporuData(true);
+        }
+    });
+
+    // Sayfa açıldığında otomatik veriyi çek ve 1 dakikalık sayacı başlat
+    document.addEventListener('DOMContentLoaded', () => {
+        loadKasaRaporuData(false);
+        initRaporAutoRefresh();
+    });
+</script>
+{% endblock %}

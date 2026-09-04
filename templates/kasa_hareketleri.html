@@ -1,0 +1,657 @@
+{% extends "base.html" %}
+
+{% block title %}Kasa Hareketleri - Finans Yönetimi{% endblock %}
+
+{% block content %}
+<style>
+    /* Kurumsal Finans Düzeni: Ekrana %100 tam oturan, yatay taşmasız profesyonel görünüm */
+    main {
+        max-width: 100% !important;
+        width: 100% !important;
+        padding: 0.85rem 1.25rem !important;
+        margin: 0 auto !important;
+    }
+
+    #kasa-table-wrapper {
+        width: 100% !important;
+        overflow-x: hidden !important; /* Ekrana tam otursun, yatay kaydırma çubuğu çıkmasın */
+        max-height: 700px;
+        overflow-y: auto;
+        border-radius: 8px;
+    }
+
+    #kasa-table {
+        width: 100% !important;
+        table-layout: fixed !important; /* Sütunlar tam ekrana oranlı otursun */
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+    #kasa-table th {
+        font-size: 0.82rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 0.75rem 0.55rem;
+        background: var(--card-bg-subtle);
+        border-bottom: 2px solid var(--border-color);
+        color: var(--text-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    #kasa-table td {
+        font-size: 0.86rem;
+        padding: 0.55rem 0.55rem;
+        vertical-align: middle;
+        border-bottom: 1px solid var(--border-color);
+        color: var(--text-main);
+        word-break: break-word;
+        overflow-wrap: break-word;
+        line-height: 1.35;
+    }
+
+    #kasa-table tbody tr {
+        min-height: 38px;
+        transition: background-color 0.12s ease;
+    }
+
+    #kasa-table tbody tr:nth-child(even) {
+        background-color: rgba(255, 255, 255, 0.012);
+    }
+
+    #kasa-table tbody tr:hover {
+        background-color: rgba(14, 165, 233, 0.06) !important;
+    }
+
+    .cell-aciklama {
+        white-space: normal;
+        line-height: 1.3;
+    }
+
+    .aciklama-clickable {
+        cursor: pointer;
+        display: inline-block;
+        border-bottom: 1px dotted var(--border-color);
+        transition: all 0.15s ease;
+    }
+
+    .aciklama-clickable:hover {
+        color: var(--accent);
+        border-bottom-color: var(--accent);
+    }
+
+    @keyframes pulseDot {
+        0% { transform: scale(0.9); opacity: 0.6; }
+        50% { transform: scale(1.3); opacity: 1; }
+        100% { transform: scale(0.9); opacity: 0.6; }
+    }
+</style>
+
+<div style="display: flex; flex-direction: column; gap: 1.25rem;">
+    <!-- Üst Başlık & Aksiyonlar -->
+    <div class="card" style="padding: 1.25rem 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.4)); border: 1px solid rgba(16, 185, 129, 0.4); width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.6rem;">
+                    💰
+                </div>
+                <div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                        <a href="/finans" style="color: var(--text-muted); font-size: 0.85rem; text-decoration: none;">Finans</a>
+                        <span style="color: var(--text-muted); font-size: 0.75rem;">/</span>
+                        <span style="color: var(--text-muted); font-size: 0.85rem;">Kasa</span>
+                        <span style="color: var(--text-muted); font-size: 0.75rem;">/</span>
+                        <span style="color: var(--accent); font-size: 0.85rem; font-weight: 500;">1. Kasa Hareketleri</span>
+                        <span class="status-badge ok" style="font-size: 0.72rem; padding: 2px 8px; margin-left: 0.5rem;">
+                            ● Canlı SQL Verisi
+                        </span>
+                    </div>
+                    <h1 style="font-size: 1.5rem; margin: 0; font-weight: 700; color: var(--text-main); letter-spacing: -0.02em;">Kasa Hareketleri Listesi</h1>
+                    <p style="font-size: 0.85rem; margin: 0; color: var(--text-muted);">
+                        Nakit kasa tahsilat ve tediye hareketleri, fiş, cari ve gider detayları.
+                    </p>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                <a href="/finans/kasa-raporu" class="btn" style="background: var(--card-bg-subtle); border: 1px solid var(--border-color); color: var(--text-main); font-size: 0.85rem; padding: 0.55rem 1rem; text-decoration: none; display: flex; align-items: center; gap: 0.4rem;">
+                    📊 2. Kasa Raporu
+                </a>
+                <a href="/finans/kasa-analizi" class="btn" style="background: var(--card-bg-subtle); border: 1px solid var(--border-color); color: var(--text-main); font-size: 0.85rem; padding: 0.55rem 1rem; text-decoration: none; display: flex; align-items: center; gap: 0.4rem;">
+                    📈 3. Kasa Analizi
+                </a>
+                <button type="button" class="btn" onclick="exportExcel()" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.85rem; padding: 0.55rem 1rem; display: flex; align-items: center; gap: 0.4rem;">
+                    📥 Excel İndir
+                </button>
+                <button type="button" class="btn" onclick="loadKasaData()" style="background: var(--accent); color: #fff; font-size: 0.85rem; padding: 0.55rem 1rem; display: flex; align-items: center; gap: 0.4rem;">
+                    🔄 Yenile
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Özet KPI Kartları -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.85rem;">
+        <div class="card" style="padding: 1.1rem; border-left: 4px solid #3b82f6;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem;">
+                🔄 Devir Bakiyesi
+            </div>
+            <div id="stat-devir" style="font-size: 1.4rem; font-weight: 700; color: #60a5fa; margin-bottom: 0.15rem;">
+                0,00 {{ active_currency or 'DZD' }}
+            </div>
+            <div style="font-size: 0.72rem; color: var(--text-muted);">
+                Tarih öncesi devir
+            </div>
+        </div>
+
+        <div class="card" style="padding: 1.1rem; border-left: 4px solid #10b981;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem;">
+                📥 Toplam Giren
+            </div>
+            <div id="stat-total-giris" style="font-size: 1.4rem; font-weight: 700; color: #34d399; margin-bottom: 0.15rem;">
+                0,00 {{ active_currency or 'DZD' }}
+            </div>
+            <div style="font-size: 0.72rem; color: var(--text-muted);">
+                Filtrelenen girişler toplamı
+            </div>
+        </div>
+
+        <div class="card" style="padding: 1.1rem; border-left: 4px solid #f43f5e;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem;">
+                📤 Toplam Çıkan
+            </div>
+            <div id="stat-total-cikis" style="font-size: 1.4rem; font-weight: 700; color: #fb7185; margin-bottom: 0.15rem;">
+                0,00 {{ active_currency or 'DZD' }}
+            </div>
+            <div style="font-size: 0.72rem; color: var(--text-muted);">
+                Filtrelenen çıkışlar toplamı
+            </div>
+        </div>
+
+        <div class="card" style="padding: 1.1rem; border-left: 4px solid #a855f7;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem;">
+                ⚖️ Son Bakiye
+            </div>
+            <div id="stat-son-bakiye" style="font-size: 1.4rem; font-weight: 700; color: #c084fc; margin-bottom: 0.15rem;">
+                0,00 {{ active_currency or 'DZD' }}
+            </div>
+            <div style="font-size: 0.72rem; color: var(--text-muted);">
+                Devir + Giren - Çıkan
+            </div>
+        </div>
+
+        <div class="card" style="padding: 1.1rem; border-left: 4px solid #06b6d4;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem;">
+                📋 Toplam Hareket
+            </div>
+            <div id="stat-count" style="font-size: 1.4rem; font-weight: 700; color: #38bdf8; margin-bottom: 0.15rem;">
+                0
+            </div>
+            <div style="font-size: 0.72rem; color: var(--text-muted);">
+                Kayıt adedi
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtre Çubuğu (Kompakt Tek Satır) -->
+    <div class="card" style="padding: 0.65rem 1.15rem;">
+        <form id="filter-form" onsubmit="event.preventDefault(); loadKasaData();" style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: nowrap; margin: 0;">
+            <!-- Başlangıç Tarihi -->
+            <div style="display: flex; align-items: center; gap: 0.35rem; white-space: nowrap;">
+                <label for="filter-start-date" style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted); margin: 0;">📅 Başlangıç:</label>
+                <input type="date" class="form-control" id="filter-start-date" style="font-size: 0.84rem; padding: 0.3rem 0.5rem; height: 34px; width: 135px;">
+            </div>
+
+            <!-- Bitiş Tarihi -->
+            <div style="display: flex; align-items: center; gap: 0.35rem; white-space: nowrap;">
+                <label for="filter-end-date" style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted); margin: 0;">📅 Bitiş:</label>
+                <input type="date" class="form-control" id="filter-end-date" style="font-size: 0.84rem; padding: 0.3rem 0.5rem; height: 34px; width: 135px;">
+            </div>
+
+            <!-- Kasa Seçimi -->
+            <div style="display: flex; align-items: center; gap: 0.35rem; white-space: nowrap;">
+                <label for="filter-kasa" style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted); margin: 0;">🏦 Kasa:</label>
+                <select class="form-control" id="filter-kasa" style="font-size: 0.84rem; padding: 0.3rem 0.5rem; height: 34px; max-width: 205px;">
+                    <option value="">Tüm Kasalar</option>
+                    {% for k in kasalar %}
+                    <option value="{{ k.CODE }}">{{ k.CODE }} - {{ k.NAME }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- İşlem Türü -->
+            <div style="display: flex; align-items: center; gap: 0.35rem; white-space: nowrap;">
+                <label for="filter-trcode" style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted); margin: 0;">🏷️ Tür:</label>
+                <select class="form-control" id="filter-trcode" style="font-size: 0.84rem; padding: 0.3rem 0.5rem; height: 34px; max-width: 175px;">
+                    <option value="">Tüm İşlemler</option>
+                    <option value="1">Nakit Tahsilat (1)</option>
+                    <option value="2">Nakit Ödeme (2)</option>
+                    <option value="3">Borç Dekontu (3)</option>
+                    <option value="4">Alacak Dekontu (4)</option>
+                    <option value="11">Cari Tahsilat (11)</option>
+                    <option value="12">Cari Ödeme (12)</option>
+                    <option value="21">Banka Epre/Virman (21)</option>
+                    <option value="22">Bankadan Çekilen (22)</option>
+                    <option value="31">Satınalma Faturası (31)</option>
+                    <option value="34">Alınan Hizmet / Gider (34)</option>
+                    <option value="35">Verilen Hizmet (35)</option>
+                    <option value="37">Perakende Satış Faturası (37)</option>
+                    <option value="61">Çek Tahsilatı (61)</option>
+                    <option value="62">Senet Tahsilatı (62)</option>
+                    <option value="71">Açılış Fişi (Borç) (71)</option>
+                    <option value="72">Açılış Fişi (Alacak) (72)</option>
+                    <option value="73">Kasa Virmanı (Giriş) (73)</option>
+                    <option value="74">Kasa Virmanı (Çıkış) (74)</option>
+                </select>
+            </div>
+
+            <!-- Arama Metni -->
+            <div style="flex: 1; min-width: 130px;">
+                <input type="text" class="form-control" id="filter-search" placeholder="🔍 Fiş No, Açıklama, Cari veya Gider..." style="font-size: 0.84rem; padding: 0.3rem 0.6rem; height: 34px; width: 100%;">
+            </div>
+
+            <!-- Düğmeler -->
+            <div style="display: flex; gap: 0.4rem; align-items: center; white-space: nowrap;">
+                <button type="submit" class="btn" style="background: var(--accent); color: #fff; padding: 0.3rem 0.85rem; height: 34px; font-size: 0.84rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.3rem;">
+                    🔍 Filtrele
+                </button>
+                <button type="button" class="btn" onclick="resetFilters()" style="background: var(--card-bg-subtle); border: 1px solid var(--border-color); color: var(--text-muted); padding: 0.3rem 0.7rem; height: 34px; font-size: 0.84rem; display: inline-flex; align-items: center;">
+                    Temizle
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Veri Tablosu Kartı (Tam Ekrana Sığdırılmış, Tek Satır Formatında) -->
+    <div class="card" style="padding: 0; overflow: hidden;">
+        <div style="padding: 0.85rem 1.25rem; background: var(--card-bg-subtle); border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+            <div style="font-size: 0.9rem; font-weight: 600; color: var(--text-main); display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                <span>📋 Kasa Hareket Detayları (<span id="table-row-count">0</span> kayıt)</span>
+                <span id="auto-refresh-badge" style="font-size: 0.72rem; font-weight: 600; padding: 2px 8px; border-radius: 6px; background: rgba(59, 130, 246, 0.12); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); display: inline-flex; align-items: center; gap: 0.35rem;" title="Filtreler bozulmadan her 1 dakikada bir otomatik güncellenir">
+                    <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #3b82f6; animation: pulseDot 2s infinite;"></span>
+                    1 dk Otomatik Yenileme Aktif
+                </span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <span id="last-refresh-time" style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace;"></span>
+                <div id="loading-indicator" style="display: none; font-size: 0.85rem; color: var(--accent); align-items: center; gap: 0.4rem;">
+                    ⏳ Veriler yükleniyor...
+                </div>
+            </div>
+        </div>
+
+        <div id="kasa-table-wrapper">
+            <table class="table" id="kasa-table">
+                <colgroup>
+                    <col style="width: 10%;">  <!-- KASA ADI -->
+                    <col style="width: 12%;">  <!-- TİCARİ İŞLEM GRUBU -->
+                    <col style="width: 10%;">  <!-- İŞLEM TÜRÜ -->
+                    <col style="width: 7%;">   <!-- TARİH -->
+                    <col style="width: 6%;">   <!-- FİŞ NO -->
+                    <col style="width: 12%;">  <!-- CARİ/GİDER -->
+                    <col style="width: 4%;">   <!-- DÖVİZ -->
+                    <col style="width: 15%;">  <!-- AÇIKLAMA -->
+                    <col style="width: 8%;">   <!-- GİREN -->
+                    <col style="width: 8%;">   <!-- ÇIKAN -->
+                    <col style="width: 8%;">   <!-- BAKİYE -->
+                </colgroup>
+                <thead style="position: sticky; top: 0; z-index: 2;">
+                    <tr>
+                        <th>KASA ADI</th>
+                        <th>TİCARİ İŞLEM GRUBU</th>
+                        <th>İŞLEM TÜRÜ</th>
+                        <th style="text-align: center;">TARİH</th>
+                        <th style="text-align: center;">FİŞ NO</th>
+                        <th>CARİ/GİDER</th>
+                        <th style="text-align: center;">DÖVİZ</th>
+                        <th>AÇIKLAMA</th>
+                        <th style="text-align: right;">GİREN</th>
+                        <th style="text-align: right;">ÇIKAN</th>
+                        <th style="text-align: right;">BAKİYE</th>
+                    </tr>
+                </thead>
+                <tbody id="kasa-table-body">
+                    <tr>
+                        <td colspan="11" style="padding: 3rem; text-align: center; color: var(--text-muted);">
+                            ⏳ Kasa hareketleri yükleniyor, lütfen bekleyiniz...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentCurrency = '{{ active_currency or "DZD" }}';
+
+    // Para birimi formatlama (KPI kartları için: Örn: 1.234,56 DZD)
+    function formatMoney(amount, curr) {
+        const c = curr || currentCurrency;
+        if (amount === null || amount === undefined || isNaN(amount)) return '0,00 ' + c;
+        return Number(amount).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + c;
+    }
+
+    // Tablo sayı formatlama (Rakamlar tek satır ve net otursun: Örn: 84.372,52)
+    function formatAmount(amount) {
+        if (amount === null || amount === undefined || isNaN(amount)) return '-';
+        const num = Number(amount);
+        if (Math.abs(num) < 0.001) return '-';
+        return num.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function formatNet(amount) {
+        if (amount === null || amount === undefined || isNaN(amount)) return '0,00';
+        return Number(amount).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    // Tarih formatlama (GG.AA.YYYY - 00.00.0000)
+    function formatDate(dVal) {
+        if (!dVal) return '-';
+        const str = String(dVal).trim();
+        if (/^\d{2}\.\d{2}\.\d{4}$/.test(str)) return str;
+        if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+            const p = str.slice(0, 10).split('-');
+            return `${p[2]}.${p[1]}.${p[0]}`;
+        }
+        try {
+            const dt = new Date(str);
+            if (!isNaN(dt.getTime())) {
+                const day = String(dt.getDate()).padStart(2, '0');
+                const month = String(dt.getMonth() + 1).padStart(2, '0');
+                const year = dt.getFullYear();
+                return `${day}.${month}.${year}`;
+            }
+        } catch (e) {}
+        return str;
+    }
+
+    // Filtre Parametrelerini Topla
+    function getFilterParams() {
+        return {
+            start_date: document.getElementById('filter-start-date').value || '',
+            end_date: document.getElementById('filter-end-date').value || '',
+            kasa_kodu: document.getElementById('filter-kasa').value || '',
+            trcode: document.getElementById('filter-trcode').value || '',
+            search: document.getElementById('filter-search').value.trim() || '',
+            limit: 2000
+        };
+    }
+
+    // Filtreleri Sıfırla
+    function resetFilters() {
+        document.getElementById('filter-start-date').value = '';
+        document.getElementById('filter-end-date').value = '';
+        document.getElementById('filter-kasa').value = '';
+        document.getElementById('filter-trcode').value = '';
+        document.getElementById('filter-search').value = '';
+        loadKasaData();
+    }
+
+    // API'den Kasa Hareketlerini Çek ve Tabloyu Doldur (Filtreleri aynen korur)
+    async function loadKasaData(isAutoRefresh = false) {
+        const loading = document.getElementById('loading-indicator');
+        const tbody = document.getElementById('kasa-table-body');
+        
+        // Otomatik periyodik yenilemede loading ikonuyla kullanıcı rahatsız edilmez
+        if (!isAutoRefresh) {
+            loading.style.display = 'inline-flex';
+        }
+
+        // Filtre formundaki tüm mevcut değerler (tarih, kasa, trcode, arama) bozulmadan aynen okunur
+        const params = getFilterParams();
+
+        try {
+            const resp = await fetch('/api/kasa-hareketleri/data', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(params)
+            });
+
+            const data = await resp.json();
+
+            if (data.success) {
+                if (data.summary && data.summary.currency) {
+                    currentCurrency = data.summary.currency;
+                }
+
+                const devir = Number(data.devir || (data.summary && data.summary.devir) || 0);
+                const sonBakiye = Number((data.summary && data.summary.son_bakiye) !== undefined ? data.summary.son_bakiye : (devir + (data.summary.total_giris || 0) - (data.summary.total_cikis || 0)));
+
+                document.getElementById('stat-devir').innerText = formatMoney(devir, currentCurrency);
+                document.getElementById('stat-total-giris').innerText = formatMoney(data.summary.total_giris, currentCurrency);
+                document.getElementById('stat-total-cikis').innerText = formatMoney(data.summary.total_cikis, currentCurrency);
+                document.getElementById('stat-son-bakiye').innerText = formatMoney(sonBakiye, currentCurrency);
+                document.getElementById('stat-count').innerText = (data.summary.count || data.count || 0).toLocaleString('tr-TR');
+                document.getElementById('table-row-count').innerText = (data.summary.count || data.count || 0).toLocaleString('tr-TR');
+
+                const timeEl = document.getElementById('last-refresh-time');
+                if (timeEl) {
+                    timeEl.innerText = 'Son: ' + new Date().toLocaleTimeString('tr-TR');
+                }
+
+                if (!data.records || data.records.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="11" style="padding: 3rem; text-align: center; color: var(--text-muted);">
+                                📭 Seçilen filtrelere uygun kasa hareketi bulunamadı.
+                            </td>
+                        </tr>
+                    `;
+                } else {
+                    // 1. Satır: DEVİR (Kullanıcının şablonuna tam uygun)
+                    const girenDevir = devir >= 0 ? devir : 0;
+                    const cikanDevir = devir < 0 ? Math.abs(devir) : 0;
+
+                    let html = `
+                        <tr style="background: rgba(14, 165, 233, 0.05); font-weight: 700; border-bottom: 2px solid var(--border-color);">
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td style="text-align: center;"><span style="padding: 2px 6px; border-radius: 4px; font-size: 0.74rem; font-weight: 700; background: var(--accent-light); color: var(--accent); border: 1px solid var(--accent);">${currentCurrency}</span></td>
+                            <td style="font-weight: 700; color: var(--accent); letter-spacing: 0.05em; font-size: 0.86rem;">DEVİR</td>
+                            <td style="text-align: right; font-family: 'Consolas', monospace; font-variant-numeric: tabular-nums; font-size: 0.88rem; font-weight: 700; color: #10b981; white-space: nowrap;">
+                                ${girenDevir > 0 ? formatMoney(girenDevir, currentCurrency) : ''}
+                            </td>
+                            <td style="text-align: right; font-family: 'Consolas', monospace; font-variant-numeric: tabular-nums; font-size: 0.88rem; font-weight: 700; color: #f43f5e; white-space: nowrap;">
+                                ${cikanDevir > 0 ? formatMoney(cikanDevir, currentCurrency) : ''}
+                            </td>
+                            <td style="text-align: right; font-family: 'Consolas', monospace; font-variant-numeric: tabular-nums; font-size: 0.88rem; font-weight: 800; color: var(--text-main); white-space: nowrap;">
+                                ${formatMoney(devir, currentCurrency)}
+                            </td>
+                        </tr>
+                    `;
+
+                    let runningBakiye = devir;
+                    data.records.forEach(r => {
+                        const giris = Number(r['Giriş (Borç)'] || 0);
+                        const cikis = Number(r['Çıkış (Alacak)'] || 0);
+                        runningBakiye += (giris - cikis);
+                        const rowBakiye = (r['Bakiye'] !== undefined && r['Bakiye'] !== null) ? Number(r['Bakiye']) : runningBakiye;
+                        const rowCurr = r['Para Birimi'] || currentCurrency;
+
+                        // 1. Kasa Adı
+                        const kasaAdi = r['Kasa Adı'] || '-';
+                        const kasaKodu = r['Kasa Kodu'] || '';
+
+                        // 2. Ticari İşlem Grubu: TAMİRAT-BAKIM ONARIM GİDERİ (124)
+                        const ticGrupAdi = r['Ticari İşlem Grubu Adı'] || '';
+                        const ticGrupKodu = r['Ticari İşlem Grubu Kodu'] || '';
+                        let ticGrupHtml = '-';
+                        if (ticGrupAdi || ticGrupKodu) {
+                            ticGrupHtml = `${escapeHtml(ticGrupAdi)} ${ticGrupKodu ? `<span style="color: #3b82f6; font-weight: 600;">(${escapeHtml(ticGrupKodu)})</span>` : ''}`;
+                        }
+
+                        // 3. İşlem Türü Rozeti (Ultra Net & Yüksek Kontrastlı)
+                        const islemTuru = r['İşlem Türü'] || '-';
+                        let badgeClass = 'badge-islem-neutral';
+                        if (islemTuru.includes('Açılış')) {
+                            badgeClass = 'badge-islem-acilis';
+                        } else if (islemTuru.includes('Tahsilat') || islemTuru.includes('Giriş') || giris > 0) {
+                            badgeClass = 'badge-islem-giris';
+                        } else if (islemTuru.includes('Ödeme') || islemTuru.includes('Gider') || islemTuru.includes('Fatura') || islemTuru.includes('Pusula') || cikis > 0) {
+                            badgeClass = 'badge-islem-cikis';
+                        } else if (islemTuru.includes('Virman') || islemTuru.includes('Banka') || islemTuru.includes('Dekont')) {
+                            badgeClass = 'badge-islem-virman';
+                        }
+
+                        // 4. Tarih (00.00.0000 formatı)
+                        const tarihStr = formatDate(r['Tarih_Str'] || r['Tarih']);
+
+                        // 5. Fiş No (Mavi 18732)
+                        const fisNoRaw = String(r['Fiş No'] || '').trim();
+                        const fisNoDisplay = fisNoRaw.replace(/^0+/, '') || fisNoRaw || '-';
+
+                        // 6. CARİ/GİDER Birleşik
+                        const cariKodu = r['Cari Kodu'] || '';
+                        const cariUnvan = r['Cari / İlgili Ünvan'] || '';
+                        const giderKodu = r['Gider Kodu'] || '';
+                        const giderAdi = r['Gider Adı'] || '';
+                        
+                        let cariGiderList = [];
+                        if (cariKodu || cariUnvan) {
+                            cariGiderList.push(`${cariKodu ? cariKodu + ' / ' : ''}${cariUnvan || ''}`);
+                        }
+                        if (giderKodu || giderAdi) {
+                            cariGiderList.push(`${giderKodu ? giderKodu + ' / ' : ''}${giderAdi || ''}`);
+                        }
+                        const cariGiderHtml = cariGiderList.length > 0 ? escapeHtml(cariGiderList.join(' - ')) : '-';
+
+                        // 7. DÖVİZ
+                        // 8. AÇIKLAMA: Soldan 40 karakter, uzun olanlar ..., üzerine tıklanınca tamamı gelir
+                        const rawAciklama = String(r['Açıklama'] || '').trim();
+                        let aciklamaHtml = '<span style="color: var(--text-muted);">-</span>';
+
+                        if (rawAciklama) {
+                            if (rawAciklama.length <= 40) {
+                                aciklamaHtml = `<span style="color: var(--text-main);">${escapeHtml(rawAciklama)}</span>`;
+                            } else {
+                                const shortPart = rawAciklama.substring(0, 40);
+                                aciklamaHtml = `
+                                    <span class="aciklama-clickable" onclick="toggleRowAciklama(this)" title="Açıklamanın tamamını görmek için tıklayın" data-expanded="false">
+                                        <span class="aciklama-short">${escapeHtml(shortPart)}...</span>
+                                        <span class="aciklama-full" style="display: none;">${escapeHtml(rawAciklama)}</span>
+                                    </span>
+                                `;
+                            }
+                        }
+
+                        // 9. GİREN, 10. ÇIKAN, 11. BAKİYE: 10.000,00 DZD
+                        const girenStr = giris > 0 ? formatMoney(giris, rowCurr) : '';
+                        const cikanStr = cikis > 0 ? formatMoney(cikis, rowCurr) : '';
+                        const bakiyeStr = formatMoney(rowBakiye, rowCurr);
+
+                        html += `
+                            <tr>
+                                <td style="font-weight: 700; color: var(--text-main); font-size: 0.85rem;" title="${escapeHtml(kasaAdi)} (${escapeHtml(kasaKodu)})">${escapeHtml(kasaAdi)}</td>
+                                <td style="font-size: 0.84rem;" title="${escapeHtml(ticGrupAdi)} (${escapeHtml(ticGrupKodu)})">${ticGrupHtml}</td>
+                                <td><span class="badge-islem ${badgeClass}" title="${escapeHtml(islemTuru)}">${escapeHtml(islemTuru)}</span></td>
+                                <td style="text-align: center; font-family: 'Consolas', monospace; font-size: 0.85rem; font-weight: 600; white-space: nowrap;">${tarihStr}</td>
+                                <td style="text-align: center; font-family: 'Consolas', monospace; font-size: 0.86rem; color: #3b82f6; font-weight: 700; white-space: nowrap;">${escapeHtml(fisNoDisplay)}</td>
+                                <td style="font-size: 0.85rem;" title="${cariGiderHtml}">${cariGiderHtml}</td>
+                                <td style="text-align: center;"><span style="padding: 2px 6px; border-radius: 4px; font-size: 0.74rem; font-weight: 700; background: var(--accent-light); color: var(--accent); border: 1px solid var(--accent);">${escapeHtml(rowCurr)}</span></td>
+                                <td class="cell-aciklama" style="font-size: 0.84rem;">${aciklamaHtml}</td>
+                                <td style="text-align: right; font-family: 'Consolas', monospace; font-variant-numeric: tabular-nums; font-size: 0.88rem; font-weight: 700; color: #10b981; white-space: nowrap;">${girenStr}</td>
+                                <td style="text-align: right; font-family: 'Consolas', monospace; font-variant-numeric: tabular-nums; font-size: 0.88rem; font-weight: 700; color: #f43f5e; white-space: nowrap;">${cikanStr}</td>
+                                <td style="text-align: right; font-family: 'Consolas', monospace; font-variant-numeric: tabular-nums; font-size: 0.88rem; font-weight: 800; color: var(--text-main); white-space: nowrap;">${bakiyeStr}</td>
+                            </tr>
+                        `;
+                    });
+                    tbody.innerHTML = html;
+                }
+            } else {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="12" style="padding: 2rem; text-align: center; color: #f87171;">
+                            ⚠️ Hata: ${data.message || 'Veriler yüklenirken bir sorun oluştu.'}
+                        </td>
+                    </tr>
+                `;
+            }
+        } catch (e) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="12" style="padding: 2rem; text-align: center; color: #f87171;">
+                        ⚠️ Bağlantı hatası: ${e.message}
+                    </td>
+                </tr>
+            `;
+        } finally {
+            loading.style.display = 'none';
+        }
+    }
+
+    // HTML Kaçış Fonksiyonu
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    // Açıklama Aç/Kapat (Soldan 40 Karakter / Tıklayınca Tamamı)
+    function toggleRowAciklama(elem) {
+        const isExpanded = elem.getAttribute('data-expanded') === 'true';
+        const shortSpan = elem.querySelector('.aciklama-short');
+        const fullSpan = elem.querySelector('.aciklama-full');
+
+        if (isExpanded) {
+            if (shortSpan) shortSpan.style.display = 'inline';
+            if (fullSpan) fullSpan.style.display = 'none';
+            elem.setAttribute('data-expanded', 'false');
+            elem.setAttribute('title', 'Açıklamanın tamamını görmek için tıklayın');
+        } else {
+            if (shortSpan) shortSpan.style.display = 'none';
+            if (fullSpan) fullSpan.style.display = 'inline';
+            elem.setAttribute('data-expanded', 'true');
+            elem.setAttribute('title', 'Kısaltmak için tıklayın');
+        }
+    }
+
+    // Excel İndirme
+    function exportExcel() {
+        const p = getFilterParams();
+        const url = `/api/kasa-hareketleri/export?start_date=${encodeURIComponent(p.start_date)}&end_date=${encodeURIComponent(p.end_date)}&kasa_kodu=${encodeURIComponent(p.kasa_kodu)}&trcode=${encodeURIComponent(p.trcode)}&search=${encodeURIComponent(p.search)}`;
+        window.location.href = url;
+    }
+
+    // 1 Dakikalık Otomatik Yenileme (Filtreler Aynen Korunur)
+    let autoRefreshTimer = null;
+    function initAutoRefresh() {
+        if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+        autoRefreshTimer = setInterval(() => {
+            // Ekran açıkken ve sekme aktifken her 1 dakikada bir (60 saniye) verileri sessizce tazele
+            if (!document.hidden) {
+                loadKasaData(true);
+            }
+        }, 60000);
+    }
+
+    // Tarayıcı sekmesine dönüldüğünde hemen tazele
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+            loadKasaData(true);
+        }
+    });
+
+    // Sayfa yüklendiğinde otomatik veri çek ve 1 dakikalık sayacı başlat
+    document.addEventListener('DOMContentLoaded', () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const kasaKodu = urlParams.get('kasa_kodu');
+        if (kasaKodu) {
+            const sel = document.getElementById('filter-kasa');
+            if (sel) sel.value = kasaKodu;
+        }
+        loadKasaData(false);
+        initAutoRefresh();
+    });
+</script>
+{% endblock %}

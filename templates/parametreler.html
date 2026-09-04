@@ -83,32 +83,33 @@
     }
 
     .conn-card {
-        background: linear-gradient(145deg, #1e293b, #172033);
+        background: var(--card-bg);
         border: 1px solid var(--border-color);
         border-radius: 0.85rem;
         padding: 1.5rem;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 10px 25px -5px var(--shadow-color);
         position: relative;
         transition: border-color 0.2s ease, transform 0.2s ease;
     }
 
     .conn-card:hover {
-        border-color: #475569;
+        border-color: var(--accent);
         transform: translateY(-2px);
     }
 
     .conn-card.active-connection {
-        border-color: rgba(59, 130, 246, 0.5);
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px var(--accent-light);
     }
 
     .conn-header {
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        border-bottom: 1px solid var(--border-color);
         padding-bottom: 0.85rem;
         margin-bottom: 1.25rem;
     }
@@ -119,20 +120,20 @@
         justify-content: center;
         width: 28px;
         height: 28px;
-        background: rgba(59, 130, 246, 0.15);
-        color: #60a5fa;
+        background: var(--accent-light);
+        color: var(--accent);
         font-weight: 700;
         font-size: 0.85rem;
         border-radius: 6px;
-        border: 1px solid rgba(59, 130, 246, 0.3);
+        border: 1px solid var(--accent);
     }
 
     .conn-title-input {
         background: transparent;
         border: 1px dashed transparent;
-        color: #ffffff;
+        color: var(--text-main);
         font-size: 1rem;
-        font-weight: 600;
+        font-weight: 700;
         padding: 0.2rem 0.4rem;
         border-radius: 4px;
         width: 100%;
@@ -140,7 +141,7 @@
     }
 
     .conn-title-input:hover, .conn-title-input:focus {
-        background: rgba(15, 23, 42, 0.6);
+        background: var(--card-bg-subtle);
         border-color: var(--border-color);
         outline: none;
     }
@@ -157,17 +158,17 @@
 
     .form-label {
         display: block;
-        font-size: 0.8rem;
-        font-weight: 500;
-        color: var(--text-muted);
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: var(--text-main);
         margin-bottom: 0.35rem;
     }
 
     .form-control {
         width: 100%;
-        background-color: #0f172a;
+        background-color: var(--input-bg);
         border: 1px solid var(--border-color);
-        color: #f8fafc;
+        color: var(--text-main);
         padding: 0.55rem 0.75rem;
         border-radius: 0.5rem;
         font-size: 0.875rem;
@@ -177,8 +178,13 @@
 
     .form-control:focus {
         outline: none;
-        border-color: #3b82f6;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-light);
+    }
+
+    .form-control::placeholder {
+        color: var(--text-muted);
+        opacity: 0.85;
     }
 
     .password-wrapper {
@@ -200,7 +206,7 @@
     }
 
     .password-toggle:hover {
-        color: #f8fafc;
+        color: var(--text-main);
     }
 
     .checkbox-group {
@@ -209,17 +215,18 @@
         gap: 0.4rem;
         margin: 0.75rem 0 1rem 0;
         padding: 0.75rem;
-        background: rgba(15, 23, 42, 0.4);
+        background: var(--card-bg-subtle);
         border-radius: 0.5rem;
-        border: 1px solid rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border-color);
     }
 
     .checkbox-label {
         display: flex;
         align-items: center;
         gap: 0.5rem;
-        font-size: 0.8rem;
-        color: var(--text-muted);
+        font-size: 0.82rem;
+        color: var(--text-main);
+        font-weight: 500;
         cursor: pointer;
         user-select: none;
     }
@@ -417,6 +424,71 @@
         from { transform: translateX(100%); opacity: 0; }
         to { transform: translateX(0); opacity: 1; }
     }
+
+    /* Cari Kod Filtre Butonları ve Etiketleri */
+    .prefix-pill-label {
+        cursor: pointer;
+        user-select: none;
+    }
+    .prefix-pill-label input[type="checkbox"] {
+        display: none;
+    }
+    .prefix-pill-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.45rem 0.85rem;
+        border-radius: 9999px;
+        font-size: 0.82rem;
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+        font-weight: 500;
+        transition: all 0.15s ease;
+    }
+    .prefix-pill-label:hover .prefix-pill-btn {
+        border-color: var(--accent);
+        color: var(--accent);
+        background: var(--accent-light);
+    }
+    .prefix-pill-label input[type="checkbox"]:checked + .prefix-pill-btn {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #ffffff !important;
+        font-weight: 700;
+        box-shadow: 0 2px 8px var(--accent-light);
+    }
+
+    .prefix-tag-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.35rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        background: var(--accent-light);
+        border: 1px solid var(--accent);
+        color: var(--text-main);
+        font-weight: 700;
+        animation: fadeIn 0.15s ease-out;
+    }
+    .prefix-tag-item .btn-remove-tag {
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        padding: 0 0.2rem;
+        font-size: 1rem;
+        font-weight: bold;
+        line-height: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: color 0.15s ease;
+    }
+    .prefix-tag-item .btn-remove-tag:hover {
+        color: #ef4444;
+    }
 </style>
 
 <div class="param-container">
@@ -479,8 +551,8 @@
 
     <!-- 1. SEKME: BAĞLANTI (3 SQL Bağlantı Yapısı) -->
     <div id="tab-baglanti" class="tab-content active">
-        <div style="margin-bottom: 1.25rem; background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.2); padding: 0.85rem 1.25rem; border-radius: 0.6rem; display: flex; align-items: center; justify-content: space-between;">
-            <div style="font-size: 0.875rem; color: #93c5fd;">
+        <div style="margin-bottom: 1.25rem; background: var(--accent-light); border: 1px solid var(--accent); padding: 0.85rem 1.25rem; border-radius: 0.6rem; display: flex; align-items: center; justify-content: space-between;">
+            <div style="font-size: 0.875rem; color: var(--text-main); font-weight: 500;">
                 <strong>💡 SQL Bağlantı Yönetimi:</strong> Uygulamanın kullandığı 3 farklı SQL veritabanı bağlantısını aşağıdan yapılandırabilir, test edebilir ve kaydedebilirsiniz.
             </div>
         </div>
@@ -549,6 +621,48 @@
                             </button>
                         </div>
                     </div>
+                    <!-- Logo Tiger Firma & Dönem Seçimi -->
+                    <div style="background: var(--card-bg-subtle); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.85rem; margin-bottom: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.5rem;">
+                            <span style="font-size: 0.82rem; font-weight: 600; color: var(--text-main); display: flex; align-items: center; gap: 0.4rem;">
+                                🏢 Logo Tiger Firma &amp; Dönem
+                            </span>
+                            <button type="button" class="btn" id="btn-fetch-fp-{{ loop.index }}" onclick="fetchFirmsAndPeriods({{ loop.index }})" style="font-size: 0.72rem; padding: 3px 8px; background: rgba(6, 182, 212, 0.15); color: #22d3ee; border: 1px solid rgba(6, 182, 212, 0.3); border-radius: 4px; cursor: pointer;">
+                                🔄 Firmaları &amp; Dönemleri Getir
+                            </button>
+                        </div>
+
+                        <!-- Dropdown Seçiciler (DB'den otomatik dolan) -->
+                        <div class="form-row" id="fp-select-row-{{ loop.index }}" style="margin-bottom: 0.65rem; display: none;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label" style="font-size: 0.72rem;">Firma Listesi (L_CAPIFIRM)</label>
+                                <select class="form-control" id="firm-select-{{ loop.index }}" onchange="onFirmSelectChange({{ loop.index }})" style="font-size: 0.82rem;">
+                                    <option value="">Firma Seçiniz...</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label" style="font-size: 0.72rem;">Dönem Listesi (L_CAPIPERIOD)</label>
+                                <select class="form-control" id="period-select-{{ loop.index }}" onchange="onPeriodSelectChange({{ loop.index }})" style="font-size: 0.82rem;">
+                                    <option value="">Dönem Seçiniz...</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Manuel / Aktif Firma & Dönem Kodları -->
+                        <div class="form-row">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label" style="font-size: 0.72rem;">Firma No (örn: 225)</label>
+                                <input type="text" class="form-control" id="firm-{{ loop.index }}" value="{{ conn.firm_nr or '225' }}" placeholder="225" maxlength="3" oninput="updatePrefixPreview({{ loop.index }})" style="font-size: 0.85rem; font-weight: 600;">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label" style="font-size: 0.72rem;">Dönem No (örn: 01)</label>
+                                <input type="text" class="form-control" id="period-{{ loop.index }}" value="{{ conn.period_nr or '01' }}" placeholder="01" maxlength="2" oninput="updatePrefixPreview({{ loop.index }})" style="font-size: 0.85rem; font-weight: 600;">
+                            </div>
+                        </div>
+                        <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.4rem;">
+                            Tablo Ön Ekleri: <code style="color: var(--accent);">LG_<span id="firm-preview-{{ loop.index }}">{{ conn.firm_nr or '225' }}</span>_CLCARD</code> &amp; <code style="color: var(--accent);">LG_<span id="firm-preview2-{{ loop.index }}">{{ conn.firm_nr or '225' }}</span>_<span id="period-preview-{{ loop.index }}">{{ conn.period_nr or '01' }}</span>_CLFLINE</code>
+                        </div>
+                    </div>
 
                     <!-- Opsiyonlar -->
                     <div class="checkbox-group">
@@ -588,25 +702,182 @@
 
     <!-- 2. SEKME: GENEL AYARLAR -->
     <div id="tab-genel" class="tab-content">
-        <div class="card">
-            <h2 style="font-size: 1.25rem; margin-bottom: 0.75rem;">Genel Sistem Ayarları</h2>
-            <p style="margin-bottom: 1.5rem;">Sistem genelinde geçerli olan temel para birimi, tarih formatı ve yenileme sıklığı ayarları.</p>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 1.5rem; align-items: start;">
             
-            <div style="max-width: 500px;">
-                <div class="form-group">
-                    <label class="form-label">Varsayılan Para Birimi</label>
-                    <select class="form-control">
-                        <option value="TRY">TRY (₺) - Türk Lirası</option>
-                        <option value="USD">USD ($) - Amerikan Doları</option>
-                        <option value="EUR">EUR (€) - Euro</option>
-                    </select>
+            <!-- CARİ EKSTRE KOD FİLTRESİ YAPILANDIRMASI -->
+            <div class="card" style="grid-column: 1 / -1;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+                    <div>
+                        <h2 style="font-size: 1.3rem; margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.5rem; color: var(--accent);">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                <polyline points="10 9 9 9 8 9"></polyline>
+                            </svg>
+                            Cari Hesap Ekstresi - Listelenecek Cari Kod Kırılımları
+                        </h2>
+                        <p style="font-size: 0.85rem; margin: 0; color: var(--text-muted);">
+                            Cari Hesap Ekstresi sayfasındaki cari arama/seçim kutusuna hangi kod önekleriyle (örn: <code>120.01.</code>, <code>120.02.</code>, <code>120.03.</code> vb.) başlayan carilerin geleceğini buradan yönetebilirsiniz.
+                        </p>
+                    </div>
+
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-outline" style="font-size: 0.82rem; padding: 0.45rem 0.85rem;" onclick="resetCariPrefixesToDefault()">
+                            ↺ Varsayılana Sıfırla
+                        </button>
+                        <button type="button" class="btn btn-primary" id="btn-save-cari-settings" onclick="saveCariPrefixSettings()" style="font-size: 0.85rem; padding: 0.45rem 1rem;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                                <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                <polyline points="7 3 7 8 15 8"></polyline>
+                            </svg>
+                            Filtre Parametrelerini Kaydet
+                        </button>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label class="form-label">Veri Yenileme Periyodu (Dakika)</label>
-                    <input type="number" class="form-control" value="5" min="1" max="60">
+
+                <!-- Hızlı Seçim ve Kod Ekleme Alanı -->
+                <div style="background: var(--card-bg-subtle); border: 1px solid var(--border-color); border-radius: 0.75rem; padding: 1.25rem; margin-bottom: 1.25rem;">
+                    <label class="form-label" style="font-weight: 700; color: var(--text-main); margin-bottom: 0.75rem; display: block; font-size: 0.9rem;">
+                        ⚡ Hızlı Seçim (Sık Kullanılan Kod Önekleri):
+                    </label>
+                    <div style="display: flex; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 1.25rem;" id="preset-prefixes-container">
+                        <!-- Preset Checkbox Buttons -->
+                        <label class="prefix-pill-label">
+                            <input type="checkbox" class="prefix-checkbox" value="120.01." onchange="handlePrefixCheckboxChange(this)">
+                            <span class="prefix-pill-btn"><strong>120.01.</strong> Yurtiçi Alıcılar</span>
+                        </label>
+                        <label class="prefix-pill-label">
+                            <input type="checkbox" class="prefix-checkbox" value="120.02." onchange="handlePrefixCheckboxChange(this)">
+                            <span class="prefix-pill-btn"><strong>120.02.</strong> İhracat / Yurtdışı</span>
+                        </label>
+                        <label class="prefix-pill-label">
+                            <input type="checkbox" class="prefix-checkbox" value="120.03." onchange="handlePrefixCheckboxChange(this)">
+                            <span class="prefix-pill-btn"><strong>120.03.</strong> Diğer Alıcılar</span>
+                        </label>
+                        <label class="prefix-pill-label">
+                            <input type="checkbox" class="prefix-checkbox" value="120.04." onchange="handlePrefixCheckboxChange(this)">
+                            <span class="prefix-pill-btn"><strong>120.04.</strong> Özel Alıcılar</span>
+                        </label>
+                        <label class="prefix-pill-label">
+                            <input type="checkbox" class="prefix-checkbox" value="120.05." onchange="handlePrefixCheckboxChange(this)">
+                            <span class="prefix-pill-btn"><strong>120.05.</strong> Şube / Bayi</span>
+                        </label>
+                        <label class="prefix-pill-label">
+                            <input type="checkbox" class="prefix-checkbox" value="120.%" onchange="handlePrefixCheckboxChange(this)">
+                            <span class="prefix-pill-btn"><strong>120.%</strong> (Tüm Alıcılar)</span>
+                        </label>
+                        <label class="prefix-pill-label">
+                            <input type="checkbox" class="prefix-checkbox" value="320.01." onchange="handlePrefixCheckboxChange(this)">
+                            <span class="prefix-pill-btn"><strong>320.01.</strong> Yurtiçi Satıcılar</span>
+                        </label>
+                        <label class="prefix-pill-label">
+                            <input type="checkbox" class="prefix-checkbox" value="320.%" onchange="handlePrefixCheckboxChange(this)">
+                            <span class="prefix-pill-btn"><strong>320.%</strong> (Tüm Satıcılar)</span>
+                        </label>
+                    </div>
+
+                    <!-- Özel Kod Ekleme Kutusu -->
+                    <div style="border-top: 1px solid var(--border-color); padding-top: 1rem; display: flex; align-items: flex-end; gap: 0.75rem; flex-wrap: wrap;">
+                        <div style="flex: 1; min-width: 250px;">
+                            <label class="form-label" style="font-size: 0.85rem; font-weight: 600; color: var(--text-main);">➕ Listeye Özel Cari Kod Öneki Ekle:</label>
+                            <input type="text" id="input-custom-prefix" class="form-control" placeholder="Örn: 120.08. veya 320.02. veya 120.99" onkeydown="if(event.key==='Enter'){event.preventDefault(); addCustomPrefix();}">
+                        </div>
+                        <button type="button" class="btn btn-primary" onclick="addCustomPrefix()" style="height: 38px; padding: 0 1.25rem; font-weight: 600;">
+                            ＋ Ekle
+                        </button>
+                    </div>
                 </div>
-                <button class="btn btn-primary" onclick="showToast('Genel ayarlar güncellendi.', 'success')">Genel Ayarları Kaydet</button>
+
+                <!-- Aktif Seçili Kod Etiketleri (Tag List) -->
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
+                        <span style="font-size: 0.9rem; font-weight: 700; color: var(--text-main);">
+                            📌 Aktif Filtre Kodları (<span id="active-prefix-count">0</span> adet seçili):
+                        </span>
+                        <button type="button" style="background: none; border: none; color: #ef4444; font-size: 0.82rem; font-weight: 600; cursor: pointer; text-decoration: underline;" onclick="clearAllPrefixes()">
+                            Tümünü Temizle
+                        </button>
+                    </div>
+                    
+                    <div id="active-tags-container" style="display: flex; flex-wrap: wrap; gap: 0.5rem; min-height: 48px; background: var(--input-bg); border: 1px dashed var(--border-color); border-radius: 0.5rem; padding: 0.75rem;">
+                        <!-- JS dinamik render edecek -->
+                    </div>
+                    <div style="display: block; margin-top: 0.6rem; color: var(--text-main); font-size: 0.82rem; line-height: 1.5; opacity: 0.85;">
+                        ℹ️ <strong>Çalışma Mantığı:</strong> Filtre kodları temizlenirse (seçim boş bırakılırsa) hiçbir kısıtlama olmaksızın <strong>tüm cari hesaplar</strong> listelenir. Kod seçimi yapıldığında ise <strong>yalnızca seçilen kodlarla başlayan</strong> cariler ekrana gelir.
+                    </div>
+                </div>
             </div>
+
+            <!-- DİĞER GENEL AYARLAR KARTI -->
+            <div class="card">
+                <h2 style="font-size: 1.25rem; margin-bottom: 0.75rem; color: var(--accent); display: flex; align-items: center; gap: 0.5rem;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    Genel Sistem & Para Birimi Ayarları
+                </h2>
+                <p style="margin-bottom: 1.25rem; color: var(--text-muted); font-size: 0.85rem;">
+                    Sistem genelinde geçerli olan temel para birimi ve otomatik veri yenileme sıklığı ayarları.
+                </p>
+                
+                <div style="max-width: 520px;">
+                    <div class="form-group">
+                        <label class="form-label" style="font-weight: 600; color: var(--text-main);">
+                            💰 Varsayılan Para Birimi (Logo Tiger Veritabanından)
+                        </label>
+                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+                            Aktif Logo firmasında (<strong>#{{ logo_currencies.firm_nr if logo_currencies else '225' }}</strong>) kayıtlı ve kullanılan para birimleri:
+                        </div>
+                        <select class="form-control" id="genel-currency">
+                            {% if logo_currencies and logo_currencies.used_currencies %}
+                                <optgroup label="⭐ Logo'da Kullanılan Para Birimleri">
+                                    {% for c in logo_currencies.used_currencies %}
+                                    <option value="{{ c.curcode }}" 
+                                        {% if (general_settings and general_settings.default_currency == c.curcode) or (general_settings and not general_settings.default_currency and c.is_local) or (not general_settings and c.is_local) %}selected{% endif %}>
+                                        {{ c.curcode }} ({{ c.cursymbol }}) - {{ c.curname }} {% if c.is_local %}★ Logo Yerel Para Birimi{% elif c.is_rep %}★ Logo Raporlama Dövizi{% endif %}
+                                    </option>
+                                    {% endfor %}
+                                </optgroup>
+                                {% if logo_currencies.all_currencies %}
+                                <optgroup label="📋 Diğer Logo Para Birimleri">
+                                    {% for c in logo_currencies.all_currencies %}
+                                        {% if not c.is_used and not c.is_local %}
+                                        <option value="{{ c.curcode }}" {% if general_settings and general_settings.default_currency == c.curcode %}selected{% endif %}>
+                                            {{ c.curcode }} ({{ c.cursymbol }}) - {{ c.curname }}
+                                        </option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </optgroup>
+                                {% endif %}
+                            {% else %}
+                                <option value="DZD" selected>DZD (DZD) - Cezayir Dinarı ★ Logo Yerel Para Birimi</option>
+                                <option value="USD">USD ($) - ABD Doları ★ Logo Raporlama Dövizi</option>
+                                <option value="EUR">EUR (€) - Euro</option>
+                                <option value="TRY">TRY (₺) - Türk Lirası</option>
+                            {% endif %}
+                        </select>
+                        <div style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-main); background: var(--card-bg-subtle); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem 0.75rem;">
+                            📍 <strong>Logo Kaydı:</strong> Aktif firma için Logo'da tanımlı yerel para birimi 
+                            <strong style="color: var(--accent);">{{ logo_currencies.local_currency.curcode if logo_currencies and logo_currencies.local_currency else 'DZD' }} - {{ logo_currencies.local_currency.curname if logo_currencies and logo_currencies.local_currency else 'Cezayir Dinarı' }}</strong>'dır.
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 1rem;">
+                        <label class="form-label" style="font-weight: 600; color: var(--text-main);">Veri Yenileme Periyodu (Dakika)</label>
+                        <input type="number" class="form-control" id="genel-refresh" value="{{ general_settings.refresh_period if general_settings and general_settings.refresh_period else 5 }}" min="1" max="60">
+                    </div>
+
+                    <button class="btn btn-primary" id="btn-save-general-settings" onclick="saveGeneralSettings()" style="margin-top: 0.5rem; padding: 0.6rem 1.5rem; font-weight: 600;">
+                        Genel Ayarları Kaydet
+                    </button>
+                </div>
+            </div>
+
         </div>
     </div>
 
@@ -619,7 +890,7 @@
             <div class="card" style="grid-column: 1 / -1;">
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem;">
                     <div>
-                        <h2 style="font-size: 1.3rem; margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.5rem; color: #60a5fa;">
+                        <h2 style="font-size: 1.3rem; margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.5rem; color: var(--accent);">
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                                 <circle cx="9" cy="7" r="4"></circle>
@@ -641,10 +912,10 @@
                 </div>
 
                 <!-- Kullanıcı Tablosu -->
-                <div style="overflow-x: auto; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--card-bg-subtle, #0f172a);">
+                <div style="overflow-x: auto; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--card-bg);">
                     <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.875rem;">
                         <thead>
-                            <tr style="background: rgba(255, 255, 255, 0.04); border-bottom: 1px solid var(--border-color); color: var(--text-muted);">
+                            <tr style="background: var(--card-bg-subtle); border-bottom: 1px solid var(--border-color); color: var(--text-main); font-weight: 600;">
                                 <th style="padding: 0.75rem 1rem;">Kullanıcı Adı</th>
                                 <th style="padding: 0.75rem 1rem;">Ad Soyad / Tanım</th>
                                 <th style="padding: 0.75rem 1rem;">Yetki Rolü</th>
@@ -654,24 +925,24 @@
                         </thead>
                         <tbody id="user-table-body">
                             {% for u in users %}
-                            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.04);">
-                                <td style="padding: 0.75rem 1rem; font-weight: 700; color: var(--text-main, #f8fafc);">
+                            <tr style="border-bottom: 1px solid var(--border-color);">
+                                <td style="padding: 0.75rem 1rem; font-weight: 700; color: var(--text-main);">
                                     <div style="display: flex; align-items: center; gap: 0.5rem;">
                                         <span style="font-size: 1.1rem;">👤</span>
                                         <span>{{ u.username }}</span>
                                         {% if u.username == current_user.username %}
-                                        <span style="font-size: 0.7rem; background: rgba(59, 130, 246, 0.2); color: #60a5fa; padding: 0.1rem 0.4rem; border-radius: 4px;">Siz</span>
+                                        <span style="font-size: 0.7rem; background: var(--accent-light); color: var(--accent); padding: 0.1rem 0.4rem; border-radius: 4px; font-weight: 700;">Siz</span>
                                         {% endif %}
                                     </div>
                                 </td>
-                                <td style="padding: 0.75rem 1rem; color: var(--text-muted); font-weight: 500;">{{ u.name }}</td>
+                                <td style="padding: 0.75rem 1rem; color: var(--text-main); font-weight: 500;">{{ u.name }}</td>
                                 <td style="padding: 0.75rem 1rem;">
                                     {% if u.role == 'admin' %}
                                     <span style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); padding: 0.2rem 0.5rem; border-radius: 9999px; font-weight: 600;">
                                         🛡️ Yönetici (Admin)
                                     </span>
                                     {% else %}
-                                    <span style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; background: rgba(59, 130, 246, 0.15); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.3); padding: 0.2rem 0.5rem; border-radius: 9999px; font-weight: 500;">
+                                    <span style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; background: var(--accent-light); color: var(--accent); border: 1px solid var(--accent); padding: 0.2rem 0.5rem; border-radius: 9999px; font-weight: 600;">
                                         👤 Standart Kullanıcı
                                     </span>
                                     {% endif %}
@@ -685,7 +956,7 @@
                                     <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; max-width: 380px;">
                                         {% for sp in system_pages %}
                                             {% if sp.key in u.allowed_pages %}
-                                            <span style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.72rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main, #f8fafc); border: 1px solid var(--border-color); padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 600;">
+                                            <span style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.72rem; background: var(--card-bg-subtle); color: var(--text-main); border: 1px solid var(--border-color); padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 600;">
                                                 <span>{{ sp.icon }}</span> <span>{{ sp.title }}</span>
                                             </span>
                                             {% endif %}
@@ -695,7 +966,7 @@
                                 </td>
                                 <td style="padding: 0.75rem 1rem; text-align: right;">
                                     <div style="display: inline-flex; gap: 0.4rem;">
-                                        <button type="button" class="btn btn-outline" style="padding: 0.35rem 0.65rem; font-size: 0.8rem; color: #60a5fa; border-color: rgba(59, 130, 246, 0.3);" onclick='promptEditPermissions("{{ u.username }}", "{{ u.name }}", "{{ u.role }}", {{ u.allowed_pages|tojson }})'>
+                                        <button type="button" class="btn btn-outline" style="padding: 0.35rem 0.65rem; font-size: 0.8rem; color: var(--accent); border-color: var(--accent);" onclick='promptEditPermissions("{{ u.username }}", "{{ u.name }}", "{{ u.role }}", {{ u.allowed_pages|tojson }})'>
                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
@@ -749,9 +1020,9 @@
                     </div>
                 </div>
 
-                <div id="lockouts-container" style="background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border-color); border-radius: 0.6rem; padding: 1rem;">
+                <div id="lockouts-container" style="background: var(--card-bg-subtle); border: 1px solid var(--border-color); border-radius: 0.6rem; padding: 1rem;">
                     <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <span style="font-size: 0.88rem; color: var(--text-muted);">Aktif Kilit Durumu:</span>
+                        <span style="font-size: 0.88rem; color: var(--text-main); font-weight: 600;">Aktif Kilit Durumu:</span>
                         <span id="lockouts-summary-badge" style="font-size: 0.8rem; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); padding: 0.2rem 0.6rem; border-radius: 9999px; font-weight: 600;">
                             ✅ Aktif Kilitli IP Bulunmuyor
                         </span>
@@ -763,8 +1034,8 @@
 
             <!-- KENDİ ŞİFRENİ DEĞİŞTİR KARTI -->
             <div class="card">
-                <h2 style="font-size: 1.2rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <h2 style="font-size: 1.2rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; color: var(--text-main);">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
                         <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                     </svg>
@@ -801,9 +1072,9 @@
 
 <!-- YENİ KULLANICI EKLEME MODALI -->
 <div id="add-user-modal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(5px); z-index: 999; align-items: center; justify-content: center; padding: 1rem; overflow-y: auto;">
-    <div style="background: #1e293b; border: 1px solid var(--border-color); border-radius: 0.85rem; width: 100%; max-width: 520px; padding: 1.75rem; box-shadow: 0 20px 40px rgba(0,0,0,0.6); max-height: 90vh; overflow-y: auto;">
+    <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 0.85rem; width: 100%; max-width: 520px; padding: 1.75rem; box-shadow: 0 20px 40px var(--shadow-color); max-height: 90vh; overflow-y: auto;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
-            <h3 style="font-size: 1.2rem; margin: 0; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
+            <h3 style="font-size: 1.2rem; margin: 0; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem;">
                 <span>➕</span> Yeni Kullanıcı & Yetki Tanımla
             </h3>
             <button type="button" onclick="toggleAddUserModal(false)" style="background: none; border: none; color: var(--text-muted); font-size: 1.2rem; cursor: pointer;">✕</button>
@@ -833,9 +1104,9 @@
             </div>
 
             <!-- SAYFA ERİŞİM YETKİLERİ -->
-            <div id="add-user-permissions-wrap" style="margin-top: 1.25rem; padding: 1rem; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border-color); border-radius: 0.5rem;">
+            <div id="add-user-permissions-wrap" style="margin-top: 1.25rem; padding: 1rem; background: var(--card-bg-subtle); border: 1px solid var(--border-color); border-radius: 0.5rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-                    <label class="form-label" style="margin: 0; font-weight: 700; color: #60a5fa;">🛡️ Erişebileceği Sayfalar:</label>
+                    <label class="form-label" style="margin: 0; font-weight: 700; color: var(--accent);">🛡️ Erişebileceği Sayfalar:</label>
                     <div style="display: flex; gap: 0.5rem;">
                         <button type="button" class="btn btn-outline" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="toggleAllCheckboxes('add-user-page-check', true)">Tümünü Seç</button>
                         <button type="button" class="btn btn-outline" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="toggleAllCheckboxes('add-user-page-check', false)">Temizle</button>
@@ -844,7 +1115,7 @@
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;">
                     {% for sp in system_pages %}
-                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #f8fafc; cursor: pointer; background: rgba(255,255,255,0.04); padding: 0.4rem 0.6rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-main); cursor: pointer; background: var(--card-bg); padding: 0.4rem 0.6rem; border-radius: 6px; border: 1px solid var(--border-color);">
                         <input type="checkbox" class="add-user-page-check" value="{{ sp.key }}" {% if sp.key != 'parametreler' %}checked{% endif %}>
                         <span>{{ sp.icon }} {{ sp.title }}</span>
                     </label>
@@ -862,9 +1133,9 @@
 
 <!-- YETKİ VE SAYFA İZİNLERİNİ DÜZENLEME MODALI -->
 <div id="edit-permissions-modal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(5px); z-index: 999; align-items: center; justify-content: center; padding: 1rem; overflow-y: auto;">
-    <div style="background: #1e293b; border: 1px solid var(--border-color); border-radius: 0.85rem; width: 100%; max-width: 520px; padding: 1.75rem; box-shadow: 0 20px 40px rgba(0,0,0,0.6); max-height: 90vh; overflow-y: auto;">
+    <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 0.85rem; width: 100%; max-width: 520px; padding: 1.75rem; box-shadow: 0 20px 40px var(--shadow-color); max-height: 90vh; overflow-y: auto;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
-            <h3 style="font-size: 1.2rem; margin: 0; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
+            <h3 style="font-size: 1.2rem; margin: 0; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem;">
                 <span>🛡️</span> Yetkileri ve Sayfa İzinlerini Düzenle
             </h3>
             <button type="button" onclick="toggleEditPermissionsModal(false)" style="background: none; border: none; color: var(--text-muted); font-size: 1.2rem; cursor: pointer;">✕</button>
@@ -892,9 +1163,9 @@
             </div>
 
             <!-- SAYFA ERİŞİM YETKİLERİ -->
-            <div id="edit-user-permissions-wrap" style="margin-top: 1.25rem; padding: 1rem; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border-color); border-radius: 0.5rem;">
+            <div id="edit-user-permissions-wrap" style="margin-top: 1.25rem; padding: 1rem; background: var(--card-bg-subtle); border: 1px solid var(--border-color); border-radius: 0.5rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-                    <label class="form-label" style="margin: 0; font-weight: 700; color: #60a5fa;">🛡️ Erişebileceği Sayfalar:</label>
+                    <label class="form-label" style="margin: 0; font-weight: 700; color: var(--accent);">🛡️ Erişebileceği Sayfalar:</label>
                     <div style="display: flex; gap: 0.5rem;">
                         <button type="button" class="btn btn-outline" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="toggleAllCheckboxes('edit-user-page-check', true)">Tümünü Seç</button>
                         <button type="button" class="btn btn-outline" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="toggleAllCheckboxes('edit-user-page-check', false)">Temizle</button>
@@ -903,7 +1174,7 @@
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;">
                     {% for sp in system_pages %}
-                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #f8fafc; cursor: pointer; background: rgba(255,255,255,0.04); padding: 0.4rem 0.6rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-main); cursor: pointer; background: var(--card-bg); padding: 0.4rem 0.6rem; border-radius: 6px; border: 1px solid var(--border-color);">
                         <input type="checkbox" class="edit-user-page-check" value="{{ sp.key }}" id="edit-check-{{ sp.key }}">
                         <span>{{ sp.icon }} {{ sp.title }}</span>
                     </label>
@@ -921,16 +1192,16 @@
 
 <!-- ŞİFRE SIFIRLAMA MODALI -->
 <div id="reset-password-modal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(4px); z-index: 999; align-items: center; justify-content: center; padding: 1rem;">
-    <div style="background: #1e293b; border: 1px solid var(--border-color); border-radius: 0.75rem; width: 100%; max-width: 420px; padding: 1.75rem; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+    <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 0.75rem; width: 100%; max-width: 420px; padding: 1.75rem; box-shadow: 0 20px 40px var(--shadow-color);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h3 style="font-size: 1.15rem; margin: 0; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
+            <h3 style="font-size: 1.15rem; margin: 0; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem;">
                 <span>🔑</span> Şifre Belirle
             </h3>
             <button type="button" onclick="toggleResetPasswordModal(false)" style="background: none; border: none; color: var(--text-muted); font-size: 1.2rem; cursor: pointer;">✕</button>
         </div>
 
         <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem;">
-            <strong id="reset-user-display" style="color: #60a5fa;"></strong> kullanıcısı için yeni bir giriş şifresi belirleyin.
+            <strong id="reset-user-display" style="color: var(--accent);"></strong> kullanıcısı için yeni bir giriş şifresi belirleyin.
         </p>
 
         <form id="reset-password-form" onsubmit="handleAdminResetPassword(event)">
@@ -1038,6 +1309,8 @@
             database: document.getElementById(`database-${index}`).value.trim(),
             username: document.getElementById(`username-${index}`).value.trim(),
             password: document.getElementById(`password-${index}`).value,
+            firm_nr: document.getElementById(`firm-${index}`) ? document.getElementById(`firm-${index}`).value.trim() : '225',
+            period_nr: document.getElementById(`period-${index}`) ? document.getElementById(`period-${index}`).value.trim() : '01',
             trusted_connection: document.getElementById(`trusted-${index}`).checked,
             trust_server_certificate: document.getElementById(`trust-cert-${index}`).checked,
             timeout: 5,
@@ -1145,6 +1418,114 @@
                     <polyline points="7 3 7 8 15 8"></polyline>
                 </svg> Tüm Bağlantıları Kaydet`;
         }
+    }
+
+    // ============================================================
+    // LOGO TIGER FİRMA VE DÖNEM YÖNETİMİ
+    // ============================================================
+    const firmsDataByIndex = {};
+
+    async function fetchFirmsAndPeriods(index) {
+        const btn = document.getElementById(`btn-fetch-fp-${index}`);
+        const originalText = btn.innerText;
+        btn.innerText = '⏳ Getiriliyor...';
+        btn.disabled = true;
+
+        const data = getConnectionData(index);
+        try {
+            const resp = await fetch('/api/db-connections/firms-periods', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const res = await resp.json();
+            if (res.success && res.firms && res.firms.length > 0) {
+                firmsDataByIndex[index] = res.firms;
+                populateFirmsDropdown(index, res.firms);
+                document.getElementById(`fp-select-row-${index}`).style.display = 'grid';
+                showToast(`${res.firms.length} firma ve dönemleri başarıyla yüklendi.`, 'success');
+            } else {
+                showToast(res.message || 'Firma tablosu okunamadı. Firma ve dönem kodunu manuel girebilirsiniz.', 'error');
+            }
+        } catch (e) {
+            showToast('Firma listesi alınırken hata oluştu: ' + e.message, 'error');
+        } finally {
+            btn.innerText = originalText;
+            btn.disabled = false;
+        }
+    }
+
+    function populateFirmsDropdown(index, firms) {
+        const firmSelect = document.getElementById(`firm-select-${index}`);
+        firmSelect.innerHTML = '<option value="">Firma Seçiniz...</option>';
+        const currentFirm = (document.getElementById(`firm-${index}`).value || '').trim();
+
+        firms.forEach(f => {
+            const opt = document.createElement('option');
+            opt.value = f.nr;
+            opt.innerText = `${f.nr} - ${f.name || f.title || 'İsimsiz'}`;
+            if (f.nr === currentFirm) {
+                opt.selected = true;
+            }
+            firmSelect.appendChild(opt);
+        });
+
+        if (firmSelect.value) {
+            onFirmSelectChange(index);
+        }
+    }
+
+    function onFirmSelectChange(index) {
+        const firmSelect = document.getElementById(`firm-select-${index}`);
+        const periodSelect = document.getElementById(`period-select-${index}`);
+        const firmInput = document.getElementById(`firm-${index}`);
+        const selectedFirmNr = firmSelect.value;
+
+        if (selectedFirmNr) {
+            firmInput.value = selectedFirmNr;
+            updatePrefixPreview(index);
+        }
+
+        periodSelect.innerHTML = '<option value="">Dönem Seçiniz...</option>';
+        const firms = firmsDataByIndex[index] || [];
+        const firmObj = firms.find(f => f.nr === selectedFirmNr);
+
+        if (firmObj && firmObj.periods && firmObj.periods.length > 0) {
+            const currentPeriod = (document.getElementById(`period-${index}`).value || '').trim();
+            firmObj.periods.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.nr;
+                opt.innerText = `${p.nr} (${p.begdate || ''} - ${p.enddate || ''})`;
+                if (p.nr === currentPeriod) {
+                    opt.selected = true;
+                }
+                periodSelect.appendChild(opt);
+            });
+            if (!periodSelect.value && firmObj.periods.length > 0) {
+                periodSelect.value = firmObj.periods[firmObj.periods.length - 1].nr;
+                onPeriodSelectChange(index);
+            }
+        }
+    }
+
+    function onPeriodSelectChange(index) {
+        const periodSelect = document.getElementById(`period-select-${index}`);
+        const periodInput = document.getElementById(`period-${index}`);
+        if (periodSelect.value) {
+            periodInput.value = periodSelect.value;
+            updatePrefixPreview(index);
+        }
+    }
+
+    function updatePrefixPreview(index) {
+        const f = (document.getElementById(`firm-${index}`).value || '225').trim();
+        const p = (document.getElementById(`period-${index}`).value || '01').trim();
+        const p1 = document.getElementById(`firm-preview-${index}`);
+        const p2 = document.getElementById(`firm-preview2-${index}`);
+        const p3 = document.getElementById(`period-preview-${index}`);
+        if (p1) p1.innerText = f;
+        if (p2) p2.innerText = f;
+        if (p3) p3.innerText = p;
     }
 
     // Şifre Değiştirme
@@ -1510,9 +1891,154 @@
         }
     }
 
-    // Sayfa açıldığında kilitleri yükle
+    // --- CARİ HESAP EKSTRESİ KOD ÖNEKLERİ YÖNETİMİ ---
+    let selectedPrefixes = {{ (cari_settings.prefixes if cari_settings and cari_settings.prefixes else ['120.01.', '120.02.', '120.03.']) | tojson }};
+
+    function renderPrefixTags() {
+        const container = document.getElementById('active-tags-container');
+        const countSpan = document.getElementById('active-prefix-count');
+        if (!container) return;
+
+        if (countSpan) {
+            countSpan.innerText = selectedPrefixes.length;
+        }
+
+        if (selectedPrefixes.length === 0) {
+            container.innerHTML = `<div style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-main); font-size: 0.85rem; font-weight: 500; padding: 0.25rem;">
+                <span style="font-size: 1.1rem; color: var(--accent);">✨</span>
+                <span><strong style="color: var(--accent);">Filtre Yok (Tüm Cariler Açık):</strong> Hiçbir kod seçilmediği için sistemdeki bütün cari kartlar (120, 320 ve tüm alt hesaplar) kısıtlama olmadan listelenir.</span>
+            </div>`;
+        } else {
+            container.innerHTML = selectedPrefixes.map(p => `
+                <span class="prefix-tag-item">
+                    <span>${p}</span>
+                    <button type="button" class="btn-remove-tag" onclick="removePrefix('${p}')" title="Kaldır">✕</button>
+                </span>
+            `).join('');
+        }
+
+        // Checkbox durumlarını güncelle
+        document.querySelectorAll('.prefix-checkbox').forEach(cb => {
+            cb.checked = selectedPrefixes.includes(cb.value);
+        });
+    }
+
+    function handlePrefixCheckboxChange(cb) {
+        const val = cb.value;
+        if (cb.checked) {
+            if (!selectedPrefixes.includes(val)) {
+                selectedPrefixes.push(val);
+            }
+        } else {
+            selectedPrefixes = selectedPrefixes.filter(p => p !== val);
+        }
+        renderPrefixTags();
+    }
+
+    function addCustomPrefix() {
+        const input = document.getElementById('input-custom-prefix');
+        let val = (input.value || '').trim();
+        if (!val) return;
+
+        if (!selectedPrefixes.includes(val)) {
+            selectedPrefixes.push(val);
+            renderPrefixTags();
+            input.value = '';
+            showToast(`'${val}' listeye eklendi.`, 'success');
+        } else {
+            showToast(`'${val}' zaten listede mevcut.`, 'info');
+        }
+    }
+
+    function removePrefix(val) {
+        selectedPrefixes = selectedPrefixes.filter(p => p !== val);
+        renderPrefixTags();
+    }
+
+    function clearAllPrefixes() {
+        selectedPrefixes = [];
+        renderPrefixTags();
+    }
+
+    function resetCariPrefixesToDefault() {
+        selectedPrefixes = ['120.01.', '120.02.', '120.03.'];
+        renderPrefixTags();
+        showToast('Filtreler varsayılana sıfırlandı (120.01., 120.02., 120.03.).', 'info');
+    }
+
+    async function saveCariPrefixSettings() {
+        const btn = document.getElementById('btn-save-cari-settings');
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Kaydediliyor...';
+
+        try {
+            const response = await fetch('/api/settings/cari-ekstre', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prefixes: selectedPrefixes })
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                showToast(data.message, 'success');
+            } else {
+                showToast(data.message || 'Ayarlar kaydedilemedi.', 'error');
+            }
+        } catch (err) {
+            showToast('Kaydetme sırasında bir hata oluştu.', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = `
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                    <polyline points="7 3 7 8 15 8"></polyline>
+                </svg> Filtre Parametrelerini Kaydet`;
+        }
+    }
+
+    async function saveGeneralSettings() {
+        const btn = document.getElementById('btn-save-general-settings');
+        const currencyEl = document.getElementById('genel-currency');
+        const refreshEl = document.getElementById('genel-refresh');
+        const currency = currencyEl ? currencyEl.value : 'DZD';
+        const refresh = refreshEl ? refreshEl.value : 5;
+
+        if (btn) {
+            btn.disabled = true;
+            btn.innerText = '⏳ Kaydediliyor...';
+        }
+
+        try {
+            const response = await fetch('/api/settings/general', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    default_currency: currency,
+                    refresh_period: refresh
+                })
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                showToast(data.message || 'Genel ayarlar başarıyla kaydedildi.', 'success');
+            } else {
+                showToast(data.message || 'Ayarlar kaydedilemedi.', 'error');
+            }
+        } catch (err) {
+            showToast('Kaydetme sırasında bir hata oluştu: ' + err.message, 'error');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerText = 'Genel Ayarları Kaydet';
+            }
+        }
+    }
+
+    // Sayfa açıldığında kilitleri ve cari etiketlerini yükle
     document.addEventListener('DOMContentLoaded', () => {
         loadActiveLockouts();
+        renderPrefixTags();
     });
 
     // Toast Bildirim Fonksiyonu

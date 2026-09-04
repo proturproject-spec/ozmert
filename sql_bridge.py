@@ -22,35 +22,10 @@ CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'db_config.json')
 Firma = "226"
 Donem = "01"
 
-def load_config():
-    with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-        return json.load(f)
+from db_manager import get_engine as db_manager_get_engine
 
 def get_engine_by_id(conn_id=1):
-    configs = load_config()
-    cfg = next((c for c in configs if c['id'] == conn_id), None)
-    if not cfg:
-        raise ValueError(f"Bağlantı ID {conn_id} bulunamadı")
-    
-    server = cfg['server']
-    port = cfg.get('port', '1433')
-    database = cfg['database']
-    driver = cfg.get('driver', 'ODBC Driver 17 for SQL Server')
-    
-    server_part = f"{server},{port}" if port and port != "1433" else server
-    
-    if cfg.get('trusted_connection'):
-        odbc = f"DRIVER={{{driver}}};SERVER={server_part};DATABASE={database};Trusted_Connection=yes;"
-    else:
-        username = cfg['username']
-        password = cfg['password']
-        odbc = f"DRIVER={{{driver}}};SERVER={server_part};DATABASE={database};UID={username};PWD={password};"
-    
-    if cfg.get('trust_server_certificate'):
-        odbc += "TrustServerCertificate=yes;"
-    
-    encoded = urllib.parse.quote_plus(odbc)
-    return create_engine(f"mssql+pyodbc:///?odbc_connect={encoded}")
+    return db_manager_get_engine(conn_id)
 
 def verify_key():
     if not BRIDGE_API_KEY:
@@ -128,22 +103,32 @@ def test_connection():
     except Exception as e:
         return jsonify({'success': False, 'message': f"Bağlantı hatası: {str(e)}"})
 
+@bridge_app.route('/bridge/firms-periods', methods=['POST'])
+def bridge_firms_periods():
+    if not verify_key():
+        return jsonify({'error': 'Yetkisiz erişim'}), 401
+    conn_data = request.get_json()
+    from db_manager import fetch_firms_and_periods
+    return jsonify(fetch_firms_and_periods(conn_data))
+
 @bridge_app.route('/bridge/cariler')
 def bridge_cariler():
     if not verify_key():
         return jsonify({'error': 'Yetkisiz erişim'}), 401
     
     year = request.args.get('year', '2026')
-    prefix = '225' if year == '2025' else '226'
-    
+    prefixes_raw = request.args.get('prefixes', '')
+    prefixes = [p.strip() for p in prefixes_raw.split(',') if p.strip()] if prefixes_raw else None
     try:
         engine = get_engine_by_id(1)
-        query = f"SELECT CODE, DEFINITION_ FROM LG_{prefix}_CLCARD WHERE CODE LIKE '120.%' ORDER BY DEFINITION_"
+        cards_q, _, _ = cari_hesap_ekstresi.get_queries(year, prefixes=prefixes)
         with engine.connect() as conn:
-            df = pd.read_sql(text(query), conn)
+            df = pd.read_sql(text(cards_q), conn)
         return jsonify(df.to_dict(orient='records'))
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+import cari_hesap_ekstresi
 
 @bridge_app.route('/bridge/cari-ekstre')
 def bridge_cari_ekstre():
@@ -157,52 +142,7 @@ def bridge_cari_ekstre():
     if not cari:
         return jsonify({'error': 'Cari kodu eksik'}), 400
     
-    prefix = '225' if year == '2025' else '226'
-    
-    base_q = f"""
-    SELECT
-        CLF.DATE_ AS TARIH,
-        REPLACE(LTRIM(RTRIM(C.SPECODE2)), '  ', ' ') AS OZEL_KOD,
-        C.CODE + ' / ' + C.DEFINITION_ AS CARI_UNVAN,
-        CASE WHEN CLF.TRCODE = 1 THEN 'Nakit tahsilat'
-             WHEN CLF.TRCODE = 2 THEN 'Nakit ödeme'
-             WHEN CLF.TRCODE = 3 THEN 'Borç dekontu'
-             WHEN CLF.TRCODE = 4 THEN 'Alacak dekontu'
-             WHEN CLF.TRCODE = 5 THEN 'Virman İşlemi'
-             WHEN CLF.TRCODE = 6 THEN 'Kur farkı işlemi'
-             WHEN CLF.TRCODE = 12 THEN 'Özel işlem'
-             WHEN CLF.TRCODE = 14 THEN 'Açılış'
-             WHEN CLF.TRCODE = 20 THEN 'Gelen havaleler'
-             WHEN CLF.TRCODE = 21 THEN 'Gönderilen havaleler'
-             WHEN CLF.TRCODE = 31 THEN 'Mal alım fat.'
-             WHEN CLF.TRCODE = 36 THEN 'Alım iade fat.'
-             WHEN CLF.TRCODE = 37 THEN 'Perakende satış fat.'
-             WHEN CLF.TRCODE = 38 THEN 'Toptan satış fat.'
-             WHEN CLF.TRCODE = 39 THEN 'Verilen hizmet faturası'
-             WHEN CLF.TRCODE IN (61,62) THEN 'Çek/Senet Girişi'
-             WHEN CLF.TRCODE IN (63,64) THEN 'Çek/Senet Çıkışı'
-             ELSE 'Diğer' END AS ISLEM_TURU,
-        CLF.TRANNO AS FIS_NO,
-        CAST(CLF.LINEEXP AS VARCHAR(MAX)) AS ACIKLAMA,
-        CASE WHEN CLF.SIGN = 0 THEN CLF.TRNET ELSE 0 END AS BORC,
-        CASE WHEN CLF.SIGN = 1 THEN CLF.TRNET ELSE 0 END AS ALACAK
-    FROM LG_{prefix}_01_CLFLINE CLF
-    LEFT JOIN LG_{prefix}_CLCARD C ON C.LOGICALREF = CLF.CLIENTREF
-    WHERE CLF.CANCELLED = 0
-    AND LTRIM(RTRIM(C.CODE)) = LTRIM(RTRIM(:cari_code))
-    AND CAST(CLF.DATE_ AS DATE) >= :date
-    ORDER BY CLF.DATE_, CLF.FTIME, CLF.LOGICALREF
-    """
-    
-    devir_q = f"""
-    SELECT SUM(CASE WHEN CLF.SIGN = 0 THEN CLF.TRNET ELSE 0 END) -
-           SUM(CASE WHEN CLF.SIGN = 1 THEN CLF.TRNET ELSE 0 END) AS DEVIR
-    FROM LG_{prefix}_01_CLFLINE CLF
-    LEFT JOIN LG_{prefix}_CLCARD C ON C.LOGICALREF = CLF.CLIENTREF
-    WHERE CLF.CANCELLED = 0
-    AND LTRIM(RTRIM(C.CODE)) = LTRIM(RTRIM(:cari_code))
-    AND CAST(CLF.DATE_ AS DATE) < :date
-    """
+    _, base_q, devir_q = cari_hesap_ekstresi.get_queries(year)
     
     try:
         engine = get_engine_by_id(1)

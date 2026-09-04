@@ -7,3 +7,12 @@ env/
 venv/
 .idea/
 .vscode/
+
+# Yerel veritabanı ve çalışma dosyaları
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# Geçici scriptler
+write_template.py

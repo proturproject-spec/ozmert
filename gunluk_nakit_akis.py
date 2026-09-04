@@ -7,31 +7,8 @@ import re
 import pandas as pd
 import urllib
 from datetime import datetime, timedelta
-import requests as _bridge_requests
 
-# --- Bridge Konfigürasyonu (Render ortamı için) ---
-_BRIDGE_URL = os.environ.get('BRIDGE_URL', '').rstrip('/')
-_BRIDGE_KEY = os.environ.get('BRIDGE_API_KEY', '')
-_USE_BRIDGE = bool(_BRIDGE_URL)
-
-def _bridge_get(path, params=None, timeout=30):
-    """Bridge API'den GET isteği yapar."""
-    resp = _bridge_requests.get(
-        f"{_BRIDGE_URL}{path}",
-        params=params or {},
-        headers={
-            'X-Bridge-Key': _BRIDGE_KEY,
-            'ngrok-skip-browser-warning': 'true',
-            'User-Agent': 'NexlogBridgeClient/1.0'
-        },
-        timeout=timeout
-    )
-    return resp.json()
-
-try:
-    from export_eski_sablon import generate_eski_sablon_excel
-except ImportError:
-    generate_eski_sablon_excel = None
+from export_eski_sablon import generate_eski_sablon_excel
 
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
@@ -49,43 +26,22 @@ def format_currency(value):
     except (ValueError, TypeError):
         return str(value)
 
-# --- SQL BAĞLANTI AYARLARI (lazy loading - import sırasında bağlantı kurulmaz) ---
+# --- SQL BAĞLANTI AYARLARI (db_manager / db_config.json) ---
 from db_manager import get_engine
-import os
 
-_engine_cache = {}
+def get_app_engine(conn_id=1):
+    try:
+        return get_engine(conn_id)
+    except Exception as e:
+        print(f"db_manager engine {conn_id} fallback: {e}")
+        db = "NEXLOG" if conn_id == 2 else "UFUK2025"
+        params_fb = urllib.parse.quote_plus(
+            f'DRIVER={{SQL Server}};SERVER=UFUK-SERVER;DATABASE={db};UID=MDT_REPORT;PWD=MDT_REPORT'
+        )
+        return create_engine(f"mssql+pyodbc:///?odbc_connect={params_fb}")
 
-def _get_engine_lazy(conn_id):
-    """Engine'i ilk kullanımda oluşturur. Render/bridge modunda None döner."""
-    if os.environ.get('BRIDGE_URL', '').strip():
-        return None  # Bridge modu aktif, yerel SQL bağlantısı gereksiz
-    if conn_id not in _engine_cache:
-        try:
-            _engine_cache[conn_id] = get_engine(conn_id)
-        except Exception as _e:
-            print(f"Engine {conn_id} başlatma uyarısı: {_e}")
-            _engine_cache[conn_id] = None
-    return _engine_cache[conn_id]
-
-# Geriye dönük uyumluluk için property-like erişim
-class _LazyEngine:
-    def __init__(self, conn_id):
-        self._id = conn_id
-    def __bool__(self):
-        return _get_engine_lazy(self._id) is not None
-    def connect(self):
-        e = _get_engine_lazy(self._id)
-        if e is None:
-            raise RuntimeError(f"SQL Engine {self._id} bu ortamda kullanılamaz (Bridge modu aktif).")
-        return e.connect()
-    def begin(self):
-        e = _get_engine_lazy(self._id)
-        if e is None:
-            raise RuntimeError(f"SQL Engine {self._id} bu ortamda kullanılamaz (Bridge modu aktif).")
-        return e.begin()
-
-engine = _LazyEngine(1)
-engine_nexlog = _LazyEngine(2)
+engine = get_app_engine(1)
+engine_nexlog = get_app_engine(2)
 
 _NEXLOG_CATEGORIES_CACHE = None
 
@@ -191,17 +147,6 @@ def get_first_business_day(d):
     return datetime(d_date.year, d_date.month, d_date.day)
 
 def get_own_check_details(target_date, limit_date=True):
-    if _USE_BRIDGE:
-        try:
-            data = _bridge_get('/bridge/nakit/own-checks', {'date': target_date, 'limit_date': str(limit_date).lower()})
-            df = pd.DataFrame(data.get('rows', []))
-            if not df.empty and 'VADE' in df.columns:
-                df['VADE'] = pd.to_datetime(df['VADE'], errors='coerce')
-                df['VADE'] = df['VADE'].apply(get_first_business_day)
-            return df
-        except Exception as e:
-            print(f"Bridge own-checks hata: {e}")
-            return pd.DataFrame()
     # limit_date=True: sadece seçilen tarihe eşit vadeli çekler (o günün ödemeleri)
     # limit_date=False: tüm gelecek vadeli çekler (rapor için)
     if limit_date:
@@ -241,39 +186,6 @@ def get_own_check_details(target_date, limit_date=True):
     return df
 
 def get_customer_check_details(target_date, limit_date=True):
-    if _USE_BRIDGE:
-        try:
-            data = _bridge_get('/bridge/nakit/customer-checks', {'date': target_date, 'limit_date': str(limit_date).lower()})
-            df = pd.DataFrame(data.get('rows', []))
-            if not df.empty:
-                if 'VADE' in df.columns:
-                    df['VADE'] = pd.to_datetime(df['VADE'], errors='coerce')
-                    df['ORJ_VADE'] = df['VADE'].dt.strftime('%d.%m.%Y')
-                    def adjust_vade_bridge(row):
-                        banka = str(row.get('BANKA', '') or '').upper().replace('İ', 'I').replace('Ş', 'S').replace('Ğ', 'G').replace('Ü', 'U').replace('Ö', 'O').replace('Ç', 'C')
-                        our_bank = str(row.get('OUR_BANK', '') or '').upper().replace('İ', 'I').replace('Ş', 'S').replace('Ğ', 'G').replace('Ü', 'U').replace('Ö', 'O').replace('Ç', 'C')
-                        if 'QNB' in banka: banka = banka.replace('QNB', 'FINANSBANK')
-                        if 'QNB' in our_bank: our_bank = our_bank.replace('QNB', 'FINANSBANK')
-                        vade = row['VADE']
-                        durum = row.get('DURUM_KODU')
-                        if durum == 1:
-                            return get_first_business_day(vade)
-                        if not row.get('BANKA') or not row.get('OUR_BANK'):
-                            return get_first_business_day(vade + timedelta(days=1))
-                        ignore = {'BANKASI', 'BANK', 'A.S.', 'T.A.S.', 'A.S', 'T.A.S', 'VE', 'TURKIYE', 'TC', 'T.C.', 'T.C', 'YENI', 'SUBESI', 'SUBE'}
-                        b_words = [w for w in banka.split() if len(w) > 2 and w not in ignore]
-                        o_words = [w for w in our_bank.split() if len(w) > 2 and w not in ignore]
-                        is_same = any(any(bw in ow for ow in o_words) or bw in our_bank for bw in b_words) or \
-                                  any(any(ow in bw for bw in b_words) or ow in banka for ow in o_words)
-                        return get_first_business_day(vade) if is_same else get_first_business_day(vade + timedelta(days=1))
-                    df['VADE'] = df.apply(adjust_vade_bridge, axis=1)
-                    if limit_date:
-                        df = df[df['VADE'] <= pd.to_datetime(target_date)]
-                    df = df.sort_values(by='VADE')
-            return df
-        except Exception as e:
-            print(f"Bridge customer-checks hata: {e}")
-            return pd.DataFrame()
     date_filter = f"AND CONVERT(VARCHAR, CSC.DUEDATE, 23) <= '{target_date}'" if limit_date else ""
     query = f"""
     SELECT 
@@ -384,16 +296,6 @@ def get_customer_check_details(target_date, limit_date=True):
     return df
 
 def get_credit_details(target_date, limit_date=True):
-    if _USE_BRIDGE:
-        try:
-            data = _bridge_get('/bridge/nakit/credits', {'date': target_date, 'limit_date': str(limit_date).lower()})
-            df = pd.DataFrame(data.get('rows', []))
-            if not df.empty and 'VADE' in df.columns:
-                df['VADE'] = pd.to_datetime(df['VADE'], errors='coerce')
-            return df
-        except Exception as e:
-            print(f"Bridge credits hata: {e}")
-            return pd.DataFrame()
     date_filter = f"WHERE CONVERT(VARCHAR, P.DUEDATE, 23) <= '{target_date}'" if limit_date else ""
     query = f"""
     SELECT 
@@ -415,19 +317,6 @@ def get_credit_details(target_date, limit_date=True):
         return pd.read_sql(text(query), conn)
 
 def get_credit_card_details(target_date, limit_date=True):
-    if _USE_BRIDGE:
-        try:
-            data = _bridge_get('/bridge/nakit/credit-cards', {'date': target_date, 'limit_date': str(limit_date).lower()})
-            df = pd.DataFrame(data.get('rows', []))
-            if not df.empty:
-                today = datetime.now().date()
-                if 'VADE' in df.columns:
-                    df['VADE'] = pd.to_datetime(df['VADE'], errors='coerce')
-                    df['KALAN_GUN'] = (df['VADE'].dt.date - today).apply(lambda x: x.days)
-            return df
-        except Exception as e:
-            print(f"Bridge credit-cards hata: {e}")
-            return pd.DataFrame()
     today = datetime.now().date()
     date_filter = f"AND CONVERT(VARCHAR, KSV.MAX_DATE, 23) <= '{target_date}'" if limit_date else ""
     query = f"""
@@ -471,13 +360,6 @@ def get_credit_card_details(target_date, limit_date=True):
         return df
 
 def get_bank_balances():
-    if _USE_BRIDGE:
-        try:
-            data = _bridge_get('/bridge/nakit/bank-balances')
-            return pd.DataFrame(data.get('rows', []))
-        except Exception as e:
-            print(f"Bridge bank-balances hata: {e}")
-            return pd.DataFrame()
     query = f"""
     SELECT 
         BC.DEFINITION_ AS BANKA_ADI,
@@ -513,13 +395,6 @@ def get_bank_balances():
         return pd.read_sql(text(query), conn)
 
 def get_kasa_balances(target_date=None):
-    if _USE_BRIDGE:
-        try:
-            data = _bridge_get('/bridge/nakit/kasa-balances', {'date': target_date or ''})
-            return pd.DataFrame(data.get('rows', []))
-        except Exception as e:
-            print(f"Bridge kasa-balances hata: {e}")
-            return pd.DataFrame()
     date_filter = f"AND CONVERT(VARCHAR, KS.DATE_, 23) <= '{target_date}'" if target_date else ""
     query = f"""
     SELECT 
@@ -541,12 +416,6 @@ def get_kasa_balances(target_date=None):
         return pd.read_sql(text(query), conn)
 
 def get_receivables_balances():
-    if _USE_BRIDGE:
-        try:
-            return _bridge_get('/bridge/nakit/receivables')
-        except Exception as e:
-            print(f"Bridge receivables hata: {e}")
-            return {'TL': 0.0, 'USD': 0.0, 'EUR': 0.0}
     query = f"""
     SELECT
         SUM(CASE WHEN CL.CODE LIKE '120.01.%' THEN (CASE WHEN CLF.SIGN = 0 THEN CLF.AMOUNT ELSE -CLF.AMOUNT END) ELSE 0 END) AS BAKIYE_TL,
@@ -569,13 +438,6 @@ def get_receivables_balances():
         return {'TL': 0.0, 'USD': 0.0, 'EUR': 0.0}
 
 def get_open_payables_balances():
-    if _USE_BRIDGE:
-        try:
-            return _bridge_get('/bridge/nakit/payables')
-        except Exception as e:
-            print(f"Bridge payables hata: {e}")
-            empty_val = {'TL': 0.0, 'USD': 0.0, 'EUR': 0.0}
-            return {'akaryakit': empty_val, 'sigorta': empty_val, 'sanayi': empty_val, 'navlun': empty_val}
     query = f"""
     SELECT
         -- TL balances
@@ -646,135 +508,7 @@ def get_open_payables_balances():
         'navlun': empty_val
     }
 
-def get_virman_lists(target_date):
-    """
-    Logo Tiger Banka Virman Fişlerini (TRCODE=2, MODULENR=7) çeker.
-    Giren bankaları (SIGN=0) sol liste (incoming_virman) için,
-    Çıkan bankaları (SIGN=1) sağ liste (outgoing_virman) için hazırlar.
-    Karşı banka adını (KARSI_BANKA) her iki tarafa da otomatik iliştirir.
-    """
-    if _USE_BRIDGE:
-        try:
-            data = _bridge_get('/bridge/nakit/virman', {'date': target_date})
-            rows = data.get('rows', [])
-            incoming_virman = []
-            outgoing_virman = []
-            if rows:
-                import itertools
-                from itertools import groupby
-                for sf_ref, group in itertools.groupby(rows, key=lambda r: r.get('SOURCEFREF')):
-                    group = list(group)
-                    inc_rows = [r for r in group if r.get('SIGN') == 0]
-                    out_rows = [r for r in group if r.get('SIGN') == 1]
-                    out_bank_names = ", ".join([clean_bank_name(r['HESAP_ACIKLAMASI']) for r in out_rows if r.get('HESAP_ACIKLAMASI')])
-                    inc_bank_names = ", ".join([clean_bank_name(r['HESAP_ACIKLAMASI']) for r in inc_rows if r.get('HESAP_ACIKLAMASI')])
-                    for r in inc_rows:
-                        r_copy = dict(r)
-                        r_copy['HESAP_ACIKLAMASI'] = clean_bank_name(r_copy.get('HESAP_ACIKLAMASI', ''))
-                        r_copy['KARSI_BANKA'] = out_bank_names or '-'
-                        r_copy['FIS_TURU'] = 'Banka Virman Girişi'
-                        incoming_virman.append(r_copy)
-                    for r in out_rows:
-                        r_copy = dict(r)
-                        r_copy['HESAP_ACIKLAMASI'] = clean_bank_name(r_copy.get('HESAP_ACIKLAMASI', ''))
-                        r_copy['KARSI_BANKA'] = inc_bank_names or '-'
-                        r_copy['FIS_TURU'] = 'Banka Virman Çıkışı'
-                        outgoing_virman.append(r_copy)
-            return incoming_virman, outgoing_virman
-        except Exception as e:
-            print(f"Bridge virman hata: {e}")
-            return [], []
-    query = f"""
-    SELECT
-        BNFLINE.LOGICALREF,
-        BNFLINE.SOURCEFREF,
-        BNFICHE.FICHENO,
-        BNFLINE.DATE_ AS TARIH,
-        BNFLINE.SIGN,
-        BNFLINE.AMOUNT AS TL_TUTAR,
-        BNFLINE.TRNET AS DOVIZLI_TUTAR,
-        CASE BANKACC.CURRENCY WHEN 0 THEN 'TL' WHEN 1 THEN 'USD' WHEN 20 THEN 'EUR' ELSE ISNULL(L_CURRENCYLIST.CURCODE, '') END AS HESAP_DOVIZI_RAPOR,
-        BANKACC.DEFINITION_ AS HESAP_ACIKLAMASI,
-        BANKACC.CODE AS HESAP_KODU,
-        BANKACC.ACCOUNTNO AS HESAP_NO,
-        BNFLINE.LINEEXP AS SATIR_ACIKLAMASI,
-        ISNULL(BNFICHE.GENEXP1, '') +' '+ ISNULL(BNFICHE.GENEXP2, '') AS FIS_ACIKLAMASI
-    FROM LG_{Firma}_{Donem}_BNFLINE BNFLINE WITH(NOLOCK)
-    LEFT JOIN LG_{Firma}_{Donem}_BNFICHE BNFICHE WITH(NOLOCK) ON BNFICHE.LOGICALREF = BNFLINE.SOURCEFREF
-    LEFT JOIN LG_{Firma}_BANKACC BANKACC WITH(NOLOCK) ON BANKACC.LOGICALREF = BNFLINE.BNACCREF
-    LEFT OUTER JOIN L_CURRENCYLIST WITH(NOLOCK) ON L_CURRENCYLIST.CURTYPE = BANKACC.CURRENCY
-    WHERE BNFLINE.MODULENR = 7
-      AND BNFLINE.TRCODE = 2
-      AND NOT (BANKACC.CODE LIKE '50.%' OR BANKACC.CARDTYPE IN (5, 6))
-      AND CONVERT(VARCHAR, BNFLINE.DATE_, 23) = '{target_date}'
-    ORDER BY BNFLINE.SOURCEFREF, BNFLINE.SIGN
-    """
-    try:
-        with engine.connect() as conn:
-            df = pd.read_sql(text(query), conn)
-            
-        incoming_virman = []
-        outgoing_virman = []
-        if not df.empty:
-            for sf_ref, group in df.groupby('SOURCEFREF'):
-                inc_rows = group[group['SIGN'] == 0].to_dict('records')
-                out_rows = group[group['SIGN'] == 1].to_dict('records')
-                
-                out_bank_names = ", ".join([clean_bank_name(r['HESAP_ACIKLAMASI']) for r in out_rows if r['HESAP_ACIKLAMASI']])
-                inc_bank_names = ", ".join([clean_bank_name(r['HESAP_ACIKLAMASI']) for r in inc_rows if r['HESAP_ACIKLAMASI']])
-                
-                for r in inc_rows:
-                    r_copy = dict(r)
-                    r_copy['HESAP_ACIKLAMASI'] = clean_bank_name(r_copy['HESAP_ACIKLAMASI'])
-                    r_copy['KARSI_BANKA'] = out_bank_names or '-'
-                    r_copy['FIS_TURU'] = 'Banka Virman Girişi'
-                    r_copy['FICHENO'] = str(r_copy.get('FICHENO') or '').strip()
-                    if r_copy['FICHENO'] == 'nan':
-                        r_copy['FICHENO'] = ''
-                    incoming_virman.append(r_copy)
-                    
-                for r in out_rows:
-                    r_copy = dict(r)
-                    r_copy['HESAP_ACIKLAMASI'] = clean_bank_name(r_copy['HESAP_ACIKLAMASI'])
-                    r_copy['KARSI_BANKA'] = inc_bank_names or '-'
-                    r_copy['FIS_TURU'] = 'Banka Virman Çıkışı'
-                    r_copy['FICHENO'] = str(r_copy.get('FICHENO') or '').strip()
-                    if r_copy['FICHENO'] == 'nan':
-                        r_copy['FICHENO'] = ''
-                    outgoing_virman.append(r_copy)
-                    
-        return incoming_virman, outgoing_virman
-    except Exception as e:
-        print(f"get_virman_lists hata: {e}")
-        return [], []
-
 def get_incoming_transfers(target_date, filter_virman=False):
-    if _USE_BRIDGE:
-        try:
-            data = _bridge_get('/bridge/nakit/incoming', {'date': target_date, 'filter_virman': str(filter_virman).lower()})
-            rows = data.get('rows', [])
-            records = []
-            for r in rows:
-                hesap_kodu_str = str(r.get('HESAP_KODU') or '').strip()
-                fis_turu_str = str(r.get('FIS_TURU') or '').lower()
-                if hesap_kodu_str.startswith('50.') or 'kredi kart' in fis_turu_str:
-                    continue
-                if filter_virman:
-                    satir_str = str(r.get('SATIR_ACIKLAMASI') or '').lower()
-                    fis_str = str(r.get('FIS_ACIKLAMASI') or '').lower()
-                    if 'virman' in fis_turu_str or 'virman' in satir_str or 'virman' in fis_str:
-                        continue
-                doviz = str(r.get('HESAP_DOVIZI_RAPOR') or 'TL').strip()
-                if not doviz or doviz.lower() == 'nan':
-                    doviz = 'TL'
-                r['HESAP_DOVIZI_RAPOR'] = doviz
-                r['DOVIZLI_TUTAR'] = float(r.get('DOVIZLI_TUTAR') or 0.0)
-                r['TL_TUTAR'] = float(r.get('TL_TUTAR') or 0.0)
-                records.append(r)
-            return records
-        except Exception as e:
-            print(f"Bridge incoming hata: {e}")
-            return []
     virman_bank_filter = "AND BNFLINE.TRCODE NOT IN (2)" if filter_virman else ""
     virman_kasa_filter = "AND K.TRCODE NOT IN (61, 62, 63)" if filter_virman else ""
 
@@ -1064,31 +798,6 @@ def aggregate_harcirah_transfers(records):
         return records
 
 def get_outgoing_transfers(target_date, filter_virman=False, aggregate_navlun=False):
-    if _USE_BRIDGE:
-        try:
-            data = _bridge_get('/bridge/nakit/outgoing', {'date': target_date, 'filter_virman': str(filter_virman).lower()})
-            rows = data.get('rows', [])
-            records = []
-            for r in rows:
-                if filter_virman:
-                    fis_turu_str = str(r.get('FIS_TURU') or '').lower()
-                    satir_str = str(r.get('SATIR_ACIKLAMASI') or '').lower()
-                    fis_str = str(r.get('FIS_ACIKLAMASI') or '').lower()
-                    if 'virman' in fis_turu_str or 'virman' in satir_str or 'virman' in fis_str:
-                        continue
-                doviz = str(r.get('HESAP_DOVIZI_RAPOR') or 'TL').strip()
-                if not doviz or doviz.lower() == 'nan':
-                    doviz = 'TL'
-                r['HESAP_DOVIZI_RAPOR'] = doviz
-                r['DOVIZLI_TUTAR'] = abs(float(r.get('DOVIZLI_TUTAR') or 0.0))
-                r['TL_TUTAR'] = abs(float(r.get('TL_TUTAR') or 0.0))
-                records.append(r)
-            if aggregate_navlun:
-                records = aggregate_navlun_plate_transfers(records)
-            return aggregate_harcirah_transfers(records)
-        except Exception as e:
-            print(f"Bridge outgoing hata: {e}")
-            return []
     virman_bank_filter = "AND BNFLINE.TRCODE NOT IN (2)" if filter_virman else ""
     virman_kasa_filter = "AND K.TRCODE NOT IN (61, 62, 63)" if filter_virman else ""
 
@@ -1251,12 +960,6 @@ def get_tcmb_rates():
     return {'USD': 0.0, 'EUR': 0.0}
 
 def get_unbilled_invoices_totals():
-    if _USE_BRIDGE:
-        try:
-            return _bridge_get('/bridge/nakit/unbilled')
-        except Exception as e:
-            print(f"Bridge unbilled hata: {e}")
-            return {'TL': 0.0, 'USD': 0.0, 'EUR': 0.0}
     query = """
     WITH LineTotals AS (
         SELECT 
@@ -1860,16 +1563,18 @@ def dashboard():
         own_checks = get_own_check_details(selected_date)
         customer_checks = get_customer_check_details(selected_date)
         
-        # Bank virman transfers (Sol: Giren Bankalar, Sağ: Çıkan Bankalar)
-        incoming_virman, outgoing_virman = get_virman_lists(selected_date)
-
-        # Bank incoming transfers query (Tab 2: virman dışı gelenler)
-        raw_incoming_transfers = get_incoming_transfers(selected_date, filter_virman=True)
+        # Bank incoming transfers query (raw for Tab 2: includes virman, all transactions)
+        raw_incoming_transfers = get_incoming_transfers(selected_date, filter_virman=False)
+        total_incoming_transfers_tl = sum(r['TL_TUTAR'] for r in raw_incoming_transfers)
+        
+        incoming_total_tl = sum(r['TL_TUTAR'] for r in raw_incoming_transfers if r['HESAP_DOVIZI_RAPOR'] == 'TL')
+        incoming_total_usd = sum(r['DOVIZLI_TUTAR'] for r in raw_incoming_transfers if r['HESAP_DOVIZI_RAPOR'] == 'USD')
+        incoming_total_eur = sum(r['DOVIZLI_TUTAR'] for r in raw_incoming_transfers if r['HESAP_DOVIZI_RAPOR'] == 'EUR')
 
         # Grouping incoming transfers for Tab 2 (Günlük Finans Hareketleri)
         grouped_incoming = {
             'havale': [],
-            'virman': incoming_virman,
+            'virman': [],
             'kredi_kart': [],
             'kasa': [],
             'diger': []
@@ -1886,6 +1591,8 @@ def dashboard():
                 grouped_incoming['kasa'].append(r)
             elif 'kredi kart' in fis_turu_lower or 'kredi kart' in hesap_turu_lower or ' kk' in hesap_aciklamasi_lower or '/ kk' in hesap_aciklamasi_lower:
                 grouped_incoming['kredi_kart'].append(r)
+            elif 'virman' in fis_turu_lower or 'virman' in satir_exp_lower or 'virman' in fis_exp_lower:
+                grouped_incoming['virman'].append(r)
             elif 'havale' in fis_turu_lower or 'eft' in fis_turu_lower:
                 grouped_incoming['havale'].append(r)
             else:
@@ -1899,19 +1606,19 @@ def dashboard():
                 'USD': sum(r['DOVIZLI_TUTAR'] for r in items if r['HESAP_DOVIZI_RAPOR'] == 'USD'),
                 'EUR': sum(r['DOVIZLI_TUTAR'] for r in items if r['HESAP_DOVIZI_RAPOR'] == 'EUR')
             }
-            
-        total_incoming_transfers_tl = sum(incoming_totals[k]['TL'] for k in incoming_totals)
-        incoming_total_tl = sum(incoming_totals[k]['TL'] for k in incoming_totals)
-        incoming_total_usd = sum(incoming_totals[k]['USD'] for k in incoming_totals)
-        incoming_total_eur = sum(incoming_totals[k]['EUR'] for k in incoming_totals)
         
-        # Bank outgoing transfers query (Tab 2: virman dışı çıkanlar)
-        raw_outgoing_transfers = get_outgoing_transfers(selected_date, filter_virman=True, aggregate_navlun=False)
+        # Bank outgoing transfers query (raw for Tab 2: includes virman and unaggregated navlun plate lines)
+        raw_outgoing_transfers = get_outgoing_transfers(selected_date, filter_virman=False, aggregate_navlun=False)
+        total_outgoing_transfers_tl = sum(r['TL_TUTAR'] for r in raw_outgoing_transfers)
+        
+        outgoing_total_tl = sum(r['TL_TUTAR'] for r in raw_outgoing_transfers if r['HESAP_DOVIZI_RAPOR'] == 'TL')
+        outgoing_total_usd = sum(r['DOVIZLI_TUTAR'] for r in raw_outgoing_transfers if r['HESAP_DOVIZI_RAPOR'] == 'USD')
+        outgoing_total_eur = sum(r['DOVIZLI_TUTAR'] for r in raw_outgoing_transfers if r['HESAP_DOVIZI_RAPOR'] == 'EUR')
 
         # Grouping outgoing transfers for Tab 2 (Günlük Finans Hareketleri)
         grouped_outgoing = {
             'banka': [],
-            'virman': outgoing_virman,
+            'virman': [],
             'kredi_kart': [],
             'kasa': [],
             'diger': []
@@ -1928,6 +1635,8 @@ def dashboard():
                 grouped_outgoing['kasa'].append(r)
             elif 'kredi kart' in fis_turu_lower or 'kredi kart' in hesap_turu_lower or ' kk' in hesap_aciklamasi_lower or '/ kk' in hesap_aciklamasi_lower:
                 grouped_outgoing['kredi_kart'].append(r)
+            elif 'virman' in fis_turu_lower or 'virman' in satir_exp_lower or 'virman' in fis_exp_lower:
+                grouped_outgoing['virman'].append(r)
             elif ('havale' in fis_turu_lower or 'eft' in fis_turu_lower or 'giden' in fis_turu_lower
                   or 'çek öde' in fis_turu_lower or 'cek ode' in fis_turu_lower
                   or 'banka çek' in fis_turu_lower or 'banka cek' in fis_turu_lower):
@@ -1943,11 +1652,6 @@ def dashboard():
                 'USD': sum(r['DOVIZLI_TUTAR'] for r in items if r['HESAP_DOVIZI_RAPOR'] == 'USD'),
                 'EUR': sum(r['DOVIZLI_TUTAR'] for r in items if r['HESAP_DOVIZI_RAPOR'] == 'EUR')
             }
-            
-        total_outgoing_transfers_tl = sum(outgoing_totals[k]['TL'] for k in outgoing_totals)
-        outgoing_total_tl = sum(outgoing_totals[k]['TL'] for k in outgoing_totals)
-        outgoing_total_usd = sum(outgoing_totals[k]['USD'] for k in outgoing_totals)
-        outgoing_total_eur = sum(outgoing_totals[k]['EUR'] for k in outgoing_totals)
 
         # Filtered & Aggregated transfers for Tab 3 (Şablon Görünümü)
         incoming_transfers = get_incoming_transfers(selected_date, filter_virman=True)
@@ -3010,7 +2714,6 @@ def dashboard():
         customer_checks_dict = customer_checks.to_dict('records') if (hasattr(customer_checks, 'to_dict') and not customer_checks.empty) else []
 
         return render_template("gunluk_nakit_akıs.html", 
-                               aktif_sayfa='nakit_akis',
                                next_day_payments=next_day_payments,
                                next_business_date_formatted=next_business_date_formatted,
                                sol_toplam_tl=sol_toplam_tl,
@@ -3202,12 +2905,22 @@ def save_custom_payments_route():
 @app.route('/toggle_payment_paid/<int:idx>', methods=['POST', 'GET'])
 def toggle_payment_paid_route(idx):
     payments = load_custom_payments()
+    target_item = None
     if 0 <= idx < len(payments):
-        current_status = payments[idx].get('odendi', 0)
-        payments[idx]['odendi'] = 0 if current_status == 1 else 1
+        target_item = payments[idx]
+    else:
+        # Fallback: search by id
+        for p in payments:
+            if p.get('id') == idx:
+                target_item = p
+                break
+
+    if target_item is not None:
+        current_status = target_item.get('odendi', 0)
+        target_item['odendi'] = 0 if current_status == 1 else 1
         save_custom_payments_list(payments)
-        return jsonify({"success": True, "new_status": payments[idx]['odendi']})
-    return jsonify({"success": False, "error": "Index out of range"}), 400
+        return jsonify({"success": True, "new_status": target_item['odendi']})
+    return jsonify({"success": False, "error": "Ödeme kaydı bulunamadı"}), 404
 
 @app.route('/save_custom_payments_json', methods=['POST'])
 def save_custom_payments_json_route():
@@ -3250,10 +2963,15 @@ def save_custom_payments_json_route():
 @app.route('/toggle_credit_card_payment/<int:idx>', methods=['POST', 'GET'])
 def toggle_credit_card_payment_route(idx):
     payments = load_custom_payments()
+    new_state = False
     if 0 <= idx < len(payments):
         payments[idx]['credit_card_pay'] = not payments[idx].get('credit_card_pay', False)
+        new_state = payments[idx]['credit_card_pay']
         save_custom_payments_list(payments)
     
+    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'success': True, 'credit_card_pay': new_state})
+
     target_date = request.values.get('target_date', '')
     if target_date:
         return redirect(url_for('dashboard', target_date=target_date))

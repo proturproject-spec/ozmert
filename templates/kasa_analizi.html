@@ -1,0 +1,887 @@
+{% extends "base.html" %}
+
+{% block title %}Kasa Analizi - Finans Yönetimi{% endblock %}
+
+{% block content %}
+<style>
+    main {
+        max-width: 100% !important;
+        width: 100% !important;
+        padding: 0.75rem 1.1rem !important;
+        margin: 0 auto !important;
+    }
+
+    /* ─── FİLTRE TOOLBAR ─── */
+    .analiz-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        flex-wrap: wrap;
+        padding: 0.6rem 1rem;
+    }
+    .toolbar-group {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        white-space: nowrap;
+    }
+    .toolbar-label {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+    .toolbar-select, .toolbar-input {
+        font-size: 0.83rem;
+        padding: 0.28rem 0.55rem;
+        height: 32px;
+        background: var(--input-bg, #1a2233);
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+        border-radius: 6px;
+        outline: none;
+        transition: border-color 0.15s;
+    }
+    .toolbar-select:focus, .toolbar-input:focus {
+        border-color: var(--accent);
+    }
+
+    /* ─── TÜR BUTONLARI ─── */
+    .tur-btn-group {
+        display: flex;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        overflow: hidden;
+    }
+    .tur-btn {
+        padding: 0.28rem 0.75rem;
+        font-size: 0.78rem;
+        font-weight: 700;
+        cursor: pointer;
+        border: none;
+        background: transparent;
+        color: var(--text-muted);
+        transition: all 0.15s;
+        letter-spacing: 0.04em;
+        height: 32px;
+    }
+    .tur-btn:hover { background: rgba(255,255,255,0.06); color: var(--text-main); }
+    .tur-btn.active-all  { background: rgba(99,102,241,0.2);  color: #a5b4fc; }
+    .tur-btn.active-gelir { background: rgba(16,185,129,0.2); color: #34d399; }
+    .tur-btn.active-gider { background: rgba(244,63,94,0.2);  color: #fb7185; }
+
+    /* ─── KPI KARTLARI ─── */
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.7rem;
+        margin-bottom: 0;
+    }
+    .kpi-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 0.9rem 1.1rem;
+        position: relative;
+        overflow: hidden;
+    }
+    .kpi-card::before {
+        content: '';
+        position: absolute;
+        left: 0; top: 0; bottom: 0;
+        width: 4px;
+        border-radius: 10px 0 0 10px;
+    }
+    .kpi-card.giris::before { background: #10b981; }
+    .kpi-card.gider::before { background: #f43f5e; }
+    .kpi-card.net::before   { background: #a855f7; }
+    .kpi-card.sayi::before  { background: #06b6d4; }
+    .kpi-label { font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.2rem; }
+    .kpi-val   { font-size: 1.35rem; font-weight: 800; font-family: 'Consolas', monospace; line-height: 1.2; }
+    .kpi-card.giris .kpi-val { color: #34d399; }
+    .kpi-card.gider .kpi-val { color: #fb7185; }
+    .kpi-card.net   .kpi-val { color: #c084fc; }
+    .kpi-card.sayi  .kpi-val { color: #38bdf8; }
+    .kpi-sub { font-size: 0.7rem; color: var(--text-muted); margin-top: 0.15rem; }
+
+    /* ─── ANA TABLO ─── */
+    #analiz-table-wrapper {
+        overflow-x: auto;
+        border-radius: 8px;
+        max-height: calc(100vh - 310px);
+        overflow-y: auto;
+    }
+    #analiz-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        min-width: 1100px;
+    }
+    #analiz-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 3;
+        background: var(--card-bg-subtle);
+        font-size: 0.73rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--text-muted);
+        padding: 0.6rem 0.5rem;
+        border-bottom: 2px solid var(--border-color);
+        white-space: nowrap;
+        text-align: right;
+    }
+    #analiz-table thead th:first-child,
+    #analiz-table thead th:nth-child(2) {
+        text-align: left;
+    }
+    #analiz-table td {
+        font-size: 0.82rem;
+        padding: 0.42rem 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+        color: var(--text-main);
+        vertical-align: middle;
+    }
+    #analiz-table tbody tr:hover { background: rgba(14,165,233,0.05); }
+
+    /* Kategori başlık satırı */
+    .cat-header-row td {
+        background: rgba(14,165,233,0.08) !important;
+        font-size: 0.77rem !important;
+        font-weight: 800 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--accent) !important;
+        padding: 0.5rem 0.6rem !important;
+        border-top: 2px solid rgba(14,165,233,0.3);
+    }
+    /* Kalem satırı */
+    .kalem-row td:first-child {
+        padding-left: 1.2rem;
+        font-weight: 600;
+        color: var(--text-main);
+    }
+    /* Kategori toplam satırı */
+    .cat-total-row td {
+        background: rgba(14,165,233,0.04) !important;
+        font-weight: 700 !important;
+        font-size: 0.83rem !important;
+        color: var(--text-main) !important;
+        border-top: 1px solid rgba(14,165,233,0.2);
+        border-bottom: 2px solid rgba(14,165,233,0.2);
+    }
+    /* Genel toplam satırı */
+    .grand-total-row td {
+        background: rgba(99,102,241,0.1) !important;
+        font-weight: 800 !important;
+        font-size: 0.87rem !important;
+        color: #a5b4fc !important;
+        border-top: 2px solid rgba(99,102,241,0.4);
+    }
+    /* Tıklanabilir hücreler */
+    .cell-clickable {
+        cursor: pointer;
+        font-family: 'Consolas', monospace;
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+        white-space: nowrap;
+        transition: color 0.12s, background 0.12s;
+        border-radius: 3px;
+        padding: 2px 4px;
+    }
+    .cell-clickable:hover {
+        background: rgba(14,165,233,0.15);
+        color: var(--accent) !important;
+    }
+    .cell-empty { color: var(--text-muted) !important; opacity: 0.35; font-family: 'Consolas', monospace; text-align: right; }
+    .col-kalem { min-width: 220px; }
+    .col-grup  { min-width: 120px; color: var(--text-muted); font-size: 0.78rem; }
+    .col-toplam { font-weight: 800; color: var(--text-main); font-family: 'Consolas', monospace; text-align: right; white-space: nowrap; }
+
+    /* ─── DRILLDOWN MODAL ─── */
+    #drill-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.72);
+        z-index: 9000;
+        backdrop-filter: blur(3px);
+        animation: fadeIn 0.18s ease;
+    }
+    #drill-overlay.open { display: flex; align-items: center; justify-content: center; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    #drill-panel {
+        background: var(--card-bg, #111827);
+        border: 1px solid var(--border-color);
+        border-radius: 14px;
+        width: min(96vw, 1100px);
+        max-height: 82vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+        animation: slideUp 0.2s ease;
+    }
+    @keyframes slideUp { from { transform: translateY(18px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+    #drill-header {
+        padding: 1.1rem 1.4rem 0.75rem;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        flex-shrink: 0;
+    }
+    #drill-title-block .drill-eyebrow {
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 0.2rem;
+    }
+    #drill-title-block .drill-main-title {
+        font-size: 1.3rem;
+        font-weight: 800;
+        color: var(--text-main);
+        margin: 0 0 0.15rem;
+        line-height: 1.2;
+    }
+    #drill-title-block .drill-sub {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+    #drill-close-btn {
+        background: rgba(244,63,94,0.12);
+        border: 1px solid rgba(244,63,94,0.3);
+        color: #fb7185;
+        border-radius: 8px;
+        padding: 0.4rem 0.9rem;
+        font-size: 0.82rem;
+        font-weight: 700;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        flex-shrink: 0;
+        transition: background 0.15s;
+    }
+    #drill-close-btn:hover { background: rgba(244,63,94,0.22); }
+
+    #drill-body {
+        overflow-y: auto;
+        overflow-x: hidden;
+        flex: 1;
+        padding: 0;
+    }
+    #drill-table {
+        width: 100%;
+        table-layout: fixed;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    #drill-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background: var(--card-bg-subtle);
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+        padding: 0.55rem 0.65rem;
+        border-bottom: 2px solid var(--border-color);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    #drill-table td {
+        font-size: 0.82rem;
+        padding: 0.45rem 0.65rem;
+        border-bottom: 1px solid var(--border-color);
+        color: var(--text-main);
+        vertical-align: middle;
+        overflow: hidden;
+    }
+    #drill-table tbody tr:hover { background: rgba(14,165,233,0.05); }
+
+    .badge-trcode {
+        display: inline-block;
+        padding: 2px 9px;
+        border-radius: 5px;
+        font-size: 0.73rem;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+    .badge-giris  { background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.3); }
+    .badge-cikis  { background: rgba(244,63,94,0.15);  color: #fb7185; border: 1px solid rgba(244,63,94,0.3); }
+    .badge-virman { background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); }
+    .badge-diger  { background: rgba(107,114,128,0.15); color: #9ca3af; border: 1px solid rgba(107,114,128,0.3); }
+
+    /* ─── Tıklanabilir Uzun Metin Hücresi ─── */
+    .expandable-cell {
+        max-width: 220px;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        cursor: pointer;
+        font-size: 0.81rem;
+        transition: color 0.12s;
+        user-select: none;
+    }
+    .expandable-cell:hover {
+        color: var(--accent);
+    }
+    .expandable-cell.expanded {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: unset;
+        max-width: 320px;
+        color: var(--text-main);
+        word-break: break-word;
+        line-height: 1.45;
+    }
+    .expandable-cell::after {
+        content: ' ↕';
+        font-size: 0.65rem;
+        opacity: 0.45;
+        margin-left: 2px;
+    }
+    .expandable-cell.expanded::after {
+        content: ' ↑';
+        opacity: 0.7;
+        color: var(--accent);
+    }
+
+    #drill-footer {
+        padding: 0.75rem 1.4rem;
+        border-top: 1px solid var(--border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-shrink: 0;
+        background: var(--card-bg-subtle);
+    }
+    #drill-footer .footer-count { font-size: 0.78rem; color: var(--text-muted); }
+    #drill-footer .footer-total { font-size: 0.95rem; font-weight: 800; font-family: 'Consolas', monospace; color: #34d399; }
+
+    @keyframes pulseDot {
+        0%   { transform: scale(0.9); opacity: 0.6; }
+        50%  { transform: scale(1.3); opacity: 1; }
+        100% { transform: scale(0.9); opacity: 0.6; }
+    }
+    .loading-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: pulseDot 1.4s infinite; margin-right: 4px; }
+</style>
+
+<div style="display:flex; flex-direction:column; gap:0.85rem;">
+
+    <!-- ── Üst Başlık Kartı ── -->
+    <div class="card" style="padding:1.1rem 1.4rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.8rem;">
+            <div style="display:flex; align-items:center; gap:0.85rem;">
+                <div style="background:linear-gradient(135deg,rgba(99,102,241,0.2),rgba(139,92,246,0.35));border:1px solid rgba(99,102,241,0.4);width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;">📈</div>
+                <div>
+                    <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.2rem;">
+                        <a href="/finans" style="color:var(--text-muted);font-size:0.82rem;text-decoration:none;">Finans</a>
+                        <span style="color:var(--text-muted);font-size:0.72rem;">/</span>
+                        <span style="color:var(--text-muted);font-size:0.82rem;">Kasa</span>
+                        <span style="color:var(--text-muted);font-size:0.72rem;">/</span>
+                        <span style="color:var(--accent);font-size:0.82rem;font-weight:600;">3. Kasa Analizi</span>
+                    </div>
+                    <h1 style="font-size:1.4rem;margin:0;font-weight:800;color:var(--text-main);letter-spacing:-0.02em;">Kasa Analizi — Ticari İşlem Grubu Bazlı</h1>
+                    <p style="font-size:0.82rem;margin:0;color:var(--text-muted);">Aylık pivot · Kalem bazlı · Hücreye tıklayarak detay satır görüntüleme</p>
+                </div>
+            </div>
+            <div style="display:flex;gap:0.45rem;flex-wrap:wrap;align-items:center;">
+                <a href="/kasa-hareketleri" class="btn" style="background:var(--card-bg-subtle);border:1px solid var(--border-color);color:var(--text-main);font-size:0.82rem;padding:0.45rem 0.9rem;text-decoration:none;display:flex;align-items:center;gap:0.35rem;">💰 1. Hareketler</a>
+                <a href="/finans/kasa-raporu" class="btn" style="background:var(--card-bg-subtle);border:1px solid var(--border-color);color:var(--text-main);font-size:0.82rem;padding:0.45rem 0.9rem;text-decoration:none;display:flex;align-items:center;gap:0.35rem;">📊 2. Rapor</a>
+                <button onclick="exportExcel()" class="btn" style="background:rgba(16,185,129,0.13);color:#34d399;border:1px solid rgba(16,185,129,0.3);font-size:0.82rem;padding:0.45rem 0.9rem;display:flex;align-items:center;gap:0.35rem;">📥 Excel</button>
+                <button onclick="loadAnalizData()" class="btn" style="background:var(--accent);color:#fff;font-size:0.82rem;padding:0.45rem 0.9rem;display:flex;align-items:center;gap:0.35rem;">🔄 Yenile</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Filtre Toolbar ── -->
+    <div class="card" style="padding:0;">
+        <div class="analiz-toolbar">
+            <!-- YIL -->
+            <div class="toolbar-group">
+                <span class="toolbar-label">📅 Yıl</span>
+                <select id="f-year" class="toolbar-select" style="width:90px;">
+                    {% for y in years %}
+                    <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- KASA -->
+            <div class="toolbar-group">
+                <span class="toolbar-label">🏦 Kasa</span>
+                <select id="f-kasa" class="toolbar-select" style="max-width:200px;">
+                    <option value="">Tüm Kasalar</option>
+                    {% for k in kasalar %}
+                    <option value="{{ k.CODE }}">{{ k.CODE }} – {{ k.NAME }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- YÖN -->
+            <div class="toolbar-group">
+                <span class="toolbar-label">↕ Yön</span>
+                <div class="tur-btn-group">
+                    <button class="tur-btn active-all" id="btn-all" onclick="setDirection('all')">TÜM</button>
+                    <button class="tur-btn" id="btn-giris" onclick="setDirection('giris')">GELİR</button>
+                    <button class="tur-btn" id="btn-gider" onclick="setDirection('gider')">GİDER</button>
+                </div>
+            </div>
+
+            <!-- GRUP FİLTRE -->
+            <div class="toolbar-group" style="flex:1;min-width:140px;">
+                <span class="toolbar-label">🔍 Grup</span>
+                <input type="text" id="f-grup" class="toolbar-input" placeholder="Grup ara..." style="width:100%;max-width:220px;" oninput="filterTableRows()">
+            </div>
+
+            <div style="margin-left:auto;font-size:0.73rem;color:var(--text-muted);display:flex;align-items:center;gap:0.35rem;" id="row-count-badge">
+                <span id="row-count-text">— kayıt</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── KPI Kartları ── -->
+    <div class="kpi-grid">
+        <div class="kpi-card giris">
+            <div class="kpi-label">💰 Toplam Tutar</div>
+            <div class="kpi-val" id="kpi-giris">—</div>
+            <div class="kpi-sub">Seçili yıl ve filtreler</div>
+        </div>
+        <div class="kpi-card gider">
+            <div class="kpi-label">📤 Toplam Çıkış</div>
+            <div class="kpi-val" id="kpi-gider">—</div>
+            <div class="kpi-sub">Seçili yıl ve filtreler</div>
+        </div>
+        <div class="kpi-card net">
+            <div class="kpi-label">⚡ Net Tutar</div>
+            <div class="kpi-val" id="kpi-net">—</div>
+            <div class="kpi-sub">Seçili yıl ve filtreler</div>
+        </div>
+        <div class="kpi-card sayi">
+            <div class="kpi-label">📋 Kalem Sayısı</div>
+            <div class="kpi-val" id="kpi-sayi">—</div>
+            <div class="kpi-sub">Ticari işlem grubu</div>
+        </div>
+    </div>
+
+    <!-- ── Analiz Tablosu ── -->
+    <div class="card" style="padding:0;overflow:hidden;">
+        <div style="padding:0.7rem 1.1rem;background:var(--card-bg-subtle);border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+            <div style="font-size:0.87rem;font-weight:700;color:var(--text-main);display:flex;align-items:center;gap:0.5rem;">
+                <span>📋 Ticari İşlem Grubu Analizi</span>
+                <span id="year-badge" style="font-size:0.72rem;padding:2px 8px;border-radius:5px;background:rgba(99,102,241,0.12);color:#a5b4fc;border:1px solid rgba(99,102,241,0.3);font-weight:700;"></span>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.6rem;">
+                <span id="last-refresh" style="font-size:0.72rem;color:var(--text-muted);font-family:monospace;"></span>
+                <div id="loading-ind" style="display:none;font-size:0.82rem;color:var(--accent);display:none;align-items:center;gap:0.35rem;">
+                    <span class="loading-dot"></span> Yükleniyor...
+                </div>
+            </div>
+        </div>
+        <div id="analiz-table-wrapper">
+            <table id="analiz-table">
+                <thead>
+                    <tr>
+                        <th class="col-kalem" style="text-align:left;">KALEM ADI</th>
+                        <th class="col-grup" style="text-align:left;">GRUP</th>
+                        <th>OCAK</th><th>ŞUBAT</th><th>MART</th><th>NİSAN</th>
+                        <th>MAYIS</th><th>HAZİRAN</th><th>TEMMUZ</th><th>AĞUSTOS</th>
+                        <th>EYLÜL</th><th>EKİM</th><th>KASIM</th><th>ARALIK</th>
+                        <th style="border-left:2px solid var(--border-color);">TOPLAM</th>
+                    </tr>
+                </thead>
+                <tbody id="analiz-tbody">
+                    <tr><td colspan="15" style="padding:3rem;text-align:center;color:var(--text-muted);">⏳ Yükleniyor...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ─── DRILLDOWN MODAL ─── -->
+<div id="drill-overlay" onclick="closeDrillDown(event)">
+    <div id="drill-panel">
+        <div id="drill-header">
+            <div id="drill-title-block">
+                <div class="drill-eyebrow">■ İŞLEM DETAYI</div>
+                <div class="drill-main-title" id="drill-title">–</div>
+                <div class="drill-sub" id="drill-sub">–</div>
+            </div>
+            <button id="drill-close-btn" onclick="closeDrill()">✕ Kapat</button>
+        </div>
+        <div id="drill-body">
+            <table id="drill-table">
+                <colgroup>
+                    <col style="width:14%;">  <!-- KASA -->
+                    <col style="width:13%;">  <!-- İŞLEM TÜRÜ -->
+                    <col style="width:9%;">   <!-- TARİH -->
+                    <col style="width:7%;">   <!-- FİŞ NO -->
+                    <col style="width:12%;">  <!-- TUTAR -->
+                    <col style="width:22%;">  <!-- CARİ ÜNVANI -->
+                    <col style="width:23%;">  <!-- AÇIKLAMA -->
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>KASA</th>
+                        <th>İŞLEM TÜRÜ</th>
+                        <th>TARİH</th>
+                        <th>FİŞ NO</th>
+                        <th style="text-align:right;">TUTAR</th>
+                        <th>CARİ ÜNVANI</th>
+                        <th>AÇIKLAMA</th>
+                    </tr>
+                </thead>
+                <tbody id="drill-tbody">
+                    <tr><td colspan="7" style="padding:2.5rem;text-align:center;color:var(--text-muted);">⏳ Yükleniyor...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div id="drill-footer">
+            <span class="footer-count" id="drill-count">–</span>
+            <span class="footer-total" id="drill-total">–</span>
+        </div>
+    </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════
+   KASA ANALİZİ — Ticari İşlem Grubu Pivot Tablosu
+   ══════════════════════════════════════════════════════ */
+
+const MONTHS     = ['OCAK','SUBAT','MART','NISAN','MAYIS','HAZIRAN','TEMMUZ','AGUSTOS','EYLUL','EKIM','KASIM','ARALIK'];
+const MONTHS_TR  = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+
+let currentCurrency = '{{ active_currency or "DZD" }}';
+let currentDirection = 'all';
+let currentYear = {{ current_year }};
+let cachedData = null;
+
+/* ── Para Formatı ── */
+function fmt(amount) {
+    if (!amount || isNaN(amount) || Math.abs(Number(amount)) < 0.001) return '';
+    return Number(amount).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtCurr(amount) {
+    if (amount === null || amount === undefined || isNaN(amount)) return '–';
+    return Number(amount).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + currentCurrency;
+}
+function escHtml(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+
+/* ── Yön Seçimi ── */
+function setDirection(d) {
+    currentDirection = d;
+    document.getElementById('btn-all').className   = 'tur-btn' + (d==='all'   ? ' active-all'   : '');
+    document.getElementById('btn-giris').className  = 'tur-btn' + (d==='giris' ? ' active-gelir' : '');
+    document.getElementById('btn-gider').className  = 'tur-btn' + (d==='gider' ? ' active-gider' : '');
+    loadAnalizData();
+}
+
+/* ── Filtre Parametreleri ── */
+function getFilters() {
+    return {
+        year:          document.getElementById('f-year').value || currentYear,
+        kasa_kodu:     document.getElementById('f-kasa').value || '',
+        direction:     currentDirection === 'gider' ? 'cikis' : (currentDirection === 'giris' ? 'giris' : 'all'),
+        include_empty: true
+    };
+}
+
+/* ── Tablo Satır Filtresi (istemci tarafı arama) ── */
+function filterTableRows() {
+    const q = (document.getElementById('f-grup').value || '').toUpperCase().trim();
+    const rows = document.querySelectorAll('#analiz-tbody tr.kalem-row');
+    rows.forEach(tr => {
+        const txt = (tr.dataset.kalem || '') + (tr.dataset.grup || '');
+        tr.style.display = (!q || txt.toUpperCase().includes(q)) ? '' : 'none';
+    });
+}
+
+/* ══════════════════════
+   ANA VERİ YÜKLEME
+══════════════════════ */
+async function loadAnalizData() {
+    const loading = document.getElementById('loading-ind');
+    loading.style.display = 'inline-flex';
+
+    const filters = getFilters();
+    currentYear = filters.year;
+    document.getElementById('year-badge').textContent = currentYear + ' Yılı';
+
+    try {
+        const resp = await fetch('/api/kasa-analizi/data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(filters)
+        });
+        const data = await resp.json();
+
+        if (data.success) {
+            cachedData = data;
+            if (data.currency) currentCurrency = data.currency;
+            renderTable(data);
+            renderKPIs(data);
+            document.getElementById('last-refresh').textContent = 'Son: ' + new Date().toLocaleTimeString('tr-TR');
+        } else {
+            renderError(data.message || 'Veri yüklenemedi.');
+        }
+    } catch(e) {
+        renderError('Bağlantı hatası: ' + e.message);
+    } finally {
+        loading.style.display = 'none';
+    }
+}
+
+/* ── KPI Render ── */
+function renderKPIs(data) {
+    const mt = data.monthly_totals || {};
+    const allVals = Object.values(mt).map(Number);
+    const totalAll = allVals.reduce((a,b)=>a+b, 0);
+    // KPI: grand_total tüm hareketler toplamı, direction'a göre + ve - ayrımı yok bu endpointte
+    // Sadece toplam değerleri gösteriyoruz
+    document.getElementById('kpi-sayi').textContent  = (data.count || 0).toLocaleString('tr-TR') + ' kalem';
+    document.getElementById('kpi-giris').textContent  = fmtCurr(data.grand_total);
+    document.getElementById('kpi-gider').textContent  = fmtCurr(data.grand_total);
+    document.getElementById('kpi-net').textContent    = fmtCurr(data.grand_total);
+
+    // Doğru KPI: kategoriler üzerinden hesapla
+    let totalGiris = 0, totalCikis = 0;
+    if (data.categories) {
+        data.categories.forEach(cat => {
+            cat.records.forEach(r => {
+                MONTHS.forEach(m => {
+                    totalGiris += Number(r[m] || 0);
+                });
+            });
+        });
+    }
+    document.getElementById('kpi-giris').textContent = fmtCurr(data.grand_total);
+    document.getElementById('kpi-gider').textContent = fmtCurr(data.grand_total);
+    document.getElementById('kpi-net').textContent   = fmtCurr(data.grand_total);
+}
+
+/* ── Tablo Render ── */
+function renderTable(data) {
+    const tbody = document.getElementById('analiz-tbody');
+    const categories = data.categories || [];
+    const monthly_totals = data.monthly_totals || {};
+    const grand_total = data.grand_total || 0;
+    const year = data.year || currentYear;
+    const curr = data.currency || currentCurrency;
+
+    if (!categories.length) {
+        tbody.innerHTML = `<tr><td colspan="15" style="padding:3rem;text-align:center;color:var(--text-muted);">📭 Bu filtrelerle kayıt bulunamadı.</td></tr>`;
+        document.getElementById('row-count-text').textContent = '0 kayıt';
+        return;
+    }
+
+    let html = '';
+    let totalRowCount = 0;
+
+    categories.forEach(cat => {
+        // ── Kategori Başlık Satırı
+        html += `<tr class="cat-header-row">
+            <td colspan="2">${escHtml(cat.name)}</td>
+            ${MONTHS.map(m => `<td class="cell-empty">—</td>`).join('')}
+            <td class="cell-empty" style="border-left:2px solid rgba(14,165,233,0.3);">—</td>
+        </tr>`;
+
+        // ── Kalem Satırları
+        cat.records.forEach(r => {
+            totalRowCount++;
+            const kalemAdi  = r['TICARI_ISLEM_GRUBU'] || '–';
+            const grupKodu  = r['GRUP_KODU'] || '–';
+            const toplam    = Number(r['TOPLAM'] || 0);
+
+            const monthCells = MONTHS.map((m, idx) => {
+                const val = Number(r[m] || 0);
+                if (!val || Math.abs(val) < 0.001) {
+                    return `<td class="cell-empty">–</td>`;
+                }
+                return `<td class="cell-clickable" 
+                    onclick="openDrillDown('${escHtml(kalemAdi)}', '${escHtml(grupKodu)}', ${idx+1}, ${year})"
+                    title="${MONTHS_TR[idx]} ${year} · ${escHtml(kalemAdi)} — Detay için tıklayın"
+                >${fmt(val)}</td>`;
+            }).join('');
+
+            html += `<tr class="kalem-row" data-kalem="${escHtml(kalemAdi)}" data-grup="${escHtml(grupKodu)}">
+                <td class="col-kalem">${escHtml(kalemAdi)}</td>
+                <td class="col-grup"><span style="background:rgba(99,102,241,0.12);color:#a5b4fc;border:1px solid rgba(99,102,241,0.25);padding:1px 7px;border-radius:4px;font-size:0.72rem;font-weight:700;">${escHtml(grupKodu)}</span></td>
+                ${monthCells}
+                <td class="col-toplam" style="border-left:2px solid var(--border-color);">${fmt(toplam) || '–'}</td>
+            </tr>`;
+        });
+
+        // ── Kategori Toplam Satırı
+        const catMonthCells = MONTHS.map(m => {
+            const v = Number(cat.monthly_totals[m] || 0);
+            return v ? `<td style="text-align:right;font-family:'Consolas',monospace;white-space:nowrap;font-weight:700;">${fmt(v)}</td>` 
+                     : `<td class="cell-empty">–</td>`;
+        }).join('');
+
+        html += `<tr class="cat-total-row">
+            <td colspan="2" style="padding-left:0.6rem;">∑ ${escHtml(cat.total_label)}</td>
+            ${catMonthCells}
+            <td style="text-align:right;font-family:'Consolas',monospace;font-weight:800;border-left:2px solid var(--border-color);">${fmt(cat.grand_total)}</td>
+        </tr>
+        <tr><td colspan="15" style="padding:0.2rem;border:none;background:transparent;"></td></tr>`;
+    });
+
+    // ── Genel Toplam Satırı
+    const grandMonthCells = MONTHS.map(m => {
+        const v = Number(monthly_totals[m] || 0);
+        return v ? `<td style="text-align:right;font-family:'Consolas',monospace;white-space:nowrap;">${fmt(v)}</td>` 
+                 : `<td class="cell-empty">–</td>`;
+    }).join('');
+
+    html += `<tr class="grand-total-row">
+        <td colspan="2" style="font-weight:800;letter-spacing:0.06em;font-size:0.85rem;">⚡ GENEL TOPLAM</td>
+        ${grandMonthCells}
+        <td style="text-align:right;font-family:'Consolas',monospace;font-weight:900;font-size:0.92rem;border-left:2px solid rgba(99,102,241,0.4);">${fmt(grand_total)}</td>
+    </tr>`;
+
+    tbody.innerHTML = html;
+    document.getElementById('row-count-text').textContent = totalRowCount.toLocaleString('tr-TR') + ' kayıt gösteriliyor';
+
+    // KPI güncelle
+    document.getElementById('kpi-giris').textContent = fmtCurr(grand_total);
+    document.getElementById('kpi-gider').textContent = fmtCurr(grand_total);
+    document.getElementById('kpi-net').textContent   = fmtCurr(grand_total);
+    document.getElementById('kpi-sayi').textContent  = totalRowCount.toLocaleString('tr-TR') + ' kalem';
+}
+
+function renderError(msg) {
+    document.getElementById('analiz-tbody').innerHTML = `<tr><td colspan="15" style="padding:2.5rem;text-align:center;color:#f87171;">⚠️ ${escHtml(msg)}</td></tr>`;
+}
+
+/* ══════════════════════════════
+   DRILLDOWN MODAL
+══════════════════════════════ */
+async function openDrillDown(kalemAdi, grupKodu, month, year) {
+    const overlay = document.getElementById('drill-overlay');
+    const dTbody  = document.getElementById('drill-tbody');
+    const dTitle  = document.getElementById('drill-title');
+    const dSub    = document.getElementById('drill-sub');
+    const dCount  = document.getElementById('drill-count');
+    const dTotal  = document.getElementById('drill-total');
+
+    dTitle.textContent = kalemAdi;
+    dSub.textContent   = MONTHS_TR[month-1] + ' ' + year + ' · ' + grupKodu;
+    dTbody.innerHTML   = `<tr><td colspan="7" style="padding:2.5rem;text-align:center;color:var(--text-muted);"><span class="loading-dot"></span> Detaylar yükleniyor...</td></tr>`;
+    dCount.textContent  = '–';
+    dTotal.textContent  = '–';
+
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+
+    const filters = getFilters();
+    const direction = currentDirection === 'gider' ? 'cikis' : (currentDirection === 'giris' ? 'giris' : 'all');
+
+    try {
+        const resp = await fetch('/api/kasa-analizi/drilldown', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                trading_grp:  kalemAdi,
+                trading_code: grupKodu === '–' ? '' : grupKodu,
+                year:         year,
+                month:        month,
+                kasa_kodu:    filters.kasa_kodu || 'ALL',
+                direction:    direction
+            })
+        });
+        const data = await resp.json();
+
+        if (data.success && data.lines && data.lines.length > 0) {
+            const curr = data.currency || currentCurrency;
+            let html = '';
+            data.lines.forEach(l => {
+                const kasaAdi   = l['Kasa Adı'] || l['Kasa Kodu'] || '–';
+                const islemTuru = l['İşlem Türü'] || '–';
+                let badgeClass = 'badge-diger';
+                if (islemTuru.includes('Tahsilat') || islemTuru.includes('Giriş') || islemTuru.includes('Virman (Giriş)')) badgeClass = 'badge-giris';
+                else if (islemTuru.includes('Ödeme') || islemTuru.includes('Gider') || islemTuru.includes('Fatura') || islemTuru.includes('Pusula') || islemTuru.includes('Virman (Çıkış)')) badgeClass = 'badge-cikis';
+                else if (islemTuru.includes('Virman') || islemTuru.includes('Banka') || islemTuru.includes('Dekont')) badgeClass = 'badge-virman';
+
+                const tutar = Number(l['Tutar'] || 0);
+                const cari  = l['Cari Ünvanı'] || '';
+                const acik  = l['Açıklama'] || '';
+                const fisno = String(l['Fiş No'] || '').replace(/^0+/, '') || l['Fiş No'] || '–';
+
+                const cariHtml = cari
+                    ? `<span class="expandable-cell" onclick="toggleExpand(this)" title="Tıkla: genişlet / daralt">${escHtml(cari)}</span>`
+                    : `<span style="color:var(--text-muted)">–</span>`;
+                const acikHtml = acik
+                    ? `<span class="expandable-cell" onclick="toggleExpand(this)" title="Tıkla: genişlet / daralt">${escHtml(acik)}</span>`
+                    : `<span style="color:var(--text-muted)">–</span>`;
+
+                html += `<tr>
+                    <td style="font-weight:600;font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${escHtml(kasaAdi)}">${escHtml(kasaAdi)}</td>
+                    <td><span class="badge-trcode ${badgeClass}">${escHtml(islemTuru)}</span></td>
+                    <td style="font-family:'Consolas',monospace;font-size:0.81rem;white-space:nowrap;">${escHtml(l['Tarih'] || '–')}</td>
+                    <td style="font-family:'Consolas',monospace;color:#60a5fa;font-weight:700;white-space:nowrap;">${escHtml(fisno)}</td>
+                    <td style="text-align:right;font-family:'Consolas',monospace;font-variant-numeric:tabular-nums;font-weight:700;color:#34d399;white-space:nowrap;">₺${fmt(tutar)}</td>
+                    <td style="vertical-align:middle;">${cariHtml}</td>
+                    <td style="vertical-align:middle;">${acikHtml}</td>
+                </tr>`;
+            });
+            dTbody.innerHTML = html;
+            dCount.textContent = data.count.toLocaleString('tr-TR') + ' kayıt';
+            dTotal.textContent = 'Toplam: ' + fmtCurr(data.total);
+        } else {
+            dTbody.innerHTML = `<tr><td colspan="7" style="padding:2.5rem;text-align:center;color:var(--text-muted);">📭 Bu dönem için detay kayıt bulunamadı.</td></tr>`;
+            dCount.textContent = '0 kayıt';
+            dTotal.textContent = fmtCurr(0);
+        }
+    } catch(e) {
+        dTbody.innerHTML = `<tr><td colspan="7" style="padding:2rem;text-align:center;color:#f87171;">⚠️ Bağlantı hatası: ${escHtml(e.message)}</td></tr>`;
+    }
+}
+
+/* ── Metin Genişlet / Daralt ── */
+function toggleExpand(el) {
+    el.classList.toggle('expanded');
+}
+
+function closeDrill() {
+    document.getElementById('drill-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+}
+function closeDrillDown(e) {
+    if (e.target === document.getElementById('drill-overlay')) closeDrill();
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrill(); });
+
+/* ── Excel ── */
+function exportExcel() {
+    const f = getFilters();
+    const url = `/api/kasa-analizi/export?year=${encodeURIComponent(f.year)}&kasa_kodu=${encodeURIComponent(f.kasa_kodu)}&direction=${encodeURIComponent(f.direction)}&include_empty=true`;
+    window.location.href = url;
+}
+
+/* ── Yıl değişince yenile ── */
+document.getElementById('f-year').addEventListener('change', loadAnalizData);
+document.getElementById('f-kasa').addEventListener('change', loadAnalizData);
+
+/* ── Sayfa yüklenince ── */
+document.addEventListener('DOMContentLoaded', () => {
+    loadAnalizData();
+});
+</script>
+{% endblock %}

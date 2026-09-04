@@ -3,8 +3,111 @@
 {% block title %}Finans - Yönetim Paneli{% endblock %}
 
 {% block content %}
-<div class="card">
-    <h1>Finans Modülü</h1>
-    <p>Nakit akışı, banka hesapları, tahsilat ve ödeme takibi bu alanda yönetilir.</p>
+<div style="display: flex; flex-direction: column; gap: 1.5rem;">
+    <!-- Üst Başlık -->
+    <div class="card" style="padding: 1.5rem;">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <div style="background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(14, 165, 233, 0.4)); border: 1px solid rgba(6, 182, 212, 0.4); width: 52px; height: 52px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem;">
+                💳
+            </div>
+            <div>
+                <h1 style="font-size: 1.6rem; margin: 0; font-weight: 700; color: var(--text-main); letter-spacing: -0.02em;">Finans Yönetim Modülü</h1>
+                <p style="font-size: 0.9rem; margin: 0; color: var(--text-muted);">
+                    Nakit akışı, cari ekstreler, tahsilat & risk analizleri ve kasa hareketlerini tek merkezden yönetin.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modül Kartları Izgarası -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem;">
+        <!-- 1. Cari Hesap Ekstresi -->
+        {% if has_permission('cari_ekstre') %}
+        <a href="/finans/cari-ekstre" style="text-decoration: none; color: inherit;">
+            <div class="card" style="padding: 1.5rem; height: 100%; transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; border: 1px solid var(--border-color);" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'">
+                <div style="font-size: 2rem; margin-bottom: 0.75rem;">📑</div>
+                <h3 style="margin: 0 0 0.5rem 0; font-size: 1.15rem; color: var(--text-main); font-weight: 600;">Cari Hesap Ekstresi</h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0 0 1rem 0; line-height: 1.5;">
+                    Müşteri ve tedarikçi borç/alacak bakiyeleri, detaylı ekstre dökümü ve Excel aktarımı.
+                </p>
+                <div style="font-size: 0.82rem; font-weight: 600; color: var(--accent);">Modüle Git →</div>
+            </div>
+        </a>
+        {% endif %}
+
+        <!-- 2. Cari Hesap Kapama -->
+        {% if has_permission('cari_kapama') %}
+        <a href="/finans/cari-kapama" style="text-decoration: none; color: inherit;">
+            <div class="card" style="padding: 1.5rem; height: 100%; transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; border: 1px solid var(--border-color);" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'">
+                <div style="font-size: 2rem; margin-bottom: 0.75rem;">🔄</div>
+                <h3 style="margin: 0 0 0.5rem 0; font-size: 1.15rem; color: var(--text-main); font-weight: 600;">Cari Hesap Kapama</h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0 0 1rem 0; line-height: 1.5;">
+                    Açık faturalar ile tahsilat ve ödeme hareketlerinin FIFO / Manuel kapatılması.
+                </p>
+                <div style="font-size: 0.82rem; font-weight: 600; color: var(--accent);">Modüle Git →</div>
+            </div>
+        </a>
+        {% endif %}
+
+        <!-- 3. Tahsilat & Risk Takip -->
+        {% if has_permission('tahsilat_takip') %}
+        <a href="/finans/tahsilat-takip" style="text-decoration: none; color: inherit;">
+            <div class="card" style="padding: 1.5rem; height: 100%; transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; border: 1px solid var(--border-color);" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'">
+                <div style="font-size: 2rem; margin-bottom: 0.75rem;">📋</div>
+                <h3 style="margin: 0 0 0.5rem 0; font-size: 1.15rem; color: var(--text-main); font-weight: 600;">Tahsilat & Risk Takip</h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0 0 1rem 0; line-height: 1.5;">
+                    Vadesi geçen alacaklar, risk limitleri, tahsilat görüşme notları ve dövizli raporlar.
+                </p>
+                <div style="font-size: 0.82rem; font-weight: 600; color: var(--accent);">Modüle Git →</div>
+            </div>
+        </a>
+        {% endif %}
+
+        <!-- 4. Nakit Akış Paneli -->
+        {% if has_permission('nakit_akis') %}
+        <a href="/finans/nakit-akis" style="text-decoration: none; color: inherit;">
+            <div class="card" style="padding: 1.5rem; height: 100%; transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; border: 1px solid var(--border-color);" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'">
+                <div style="font-size: 2rem; margin-bottom: 0.75rem;">💵</div>
+                <h3 style="margin: 0 0 0.5rem 0; font-size: 1.15rem; color: var(--text-main); font-weight: 600;">Nakit Akış Paneli</h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0 0 1rem 0; line-height: 1.5;">
+                    Günlük ve haftalık nakit giriş-çıkış projeksiyonu, banka bakiyeleri ve bütçe planlaması.
+                </p>
+                <div style="font-size: 0.82rem; font-weight: 600; color: var(--accent);">Modüle Git →</div>
+            </div>
+        </a>
+        {% endif %}
+
+        <!-- 5. Kasa (1. Kasa Hareketleri, 2. Kasa Raporu, 3. Kasa Analizi) -->
+        {% if has_permission('kasa_raporu') or has_permission('kasa_hareketleri') or has_permission('kasa_analizi') %}
+        <div class="card" style="padding: 1.5rem; height: 100%; border: 1px solid rgba(16, 185, 129, 0.4); background: linear-gradient(180deg, var(--card-bg), rgba(16, 185, 129, 0.05)); display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div style="font-size: 2rem; margin-bottom: 0.75rem;">💰</div>
+                    <span style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); padding: 2px 8px; border-radius: 9999px; font-size: 0.72rem; font-weight: 600;">
+                        ● 3 Seçenek
+                    </span>
+                </div>
+                <h3 style="margin: 0 0 0.5rem 0; font-size: 1.15rem; color: var(--text-main); font-weight: 600;">Kasa</h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0 0 1.25rem 0; line-height: 1.5;">
+                    Nakit kasa hareketleri, fiş detayları, anlık kasa bakiyeleri ve analiz yönetimi.
+                </p>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <a href="/kasa-hareketleri" style="text-decoration: none; display: flex; align-items: center; justify-content: space-between; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; padding: 0.55rem 0.85rem; color: #34d399; font-size: 0.85rem; font-weight: 600; transition: all 0.2s;" onmouseover="this.style.background='rgba(16, 185, 129, 0.25)'" onmouseout="this.style.background='rgba(16, 185, 129, 0.12)'">
+                    <span>📋 1. Kasa Hareketleri</span>
+                    <span>→</span>
+                </a>
+                <a href="/finans/kasa-raporu" style="text-decoration: none; display: flex; align-items: center; justify-content: space-between; background: var(--card-bg-subtle); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.55rem 0.85rem; color: var(--text-main); font-size: 0.85rem; font-weight: 500; transition: all 0.2s;" onmouseover="this.style.background='var(--border-color)'" onmouseout="this.style.background='var(--card-bg-subtle)'">
+                    <span>📊 2. Kasa Raporu</span>
+                    <span>→</span>
+                </a>
+                <a href="/finans/kasa-analizi" style="text-decoration: none; display: flex; align-items: center; justify-content: space-between; background: var(--card-bg-subtle); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.55rem 0.85rem; color: var(--text-main); font-size: 0.85rem; font-weight: 500; transition: all 0.2s;" onmouseover="this.style.background='var(--border-color)'" onmouseout="this.style.background='var(--card-bg-subtle)'">
+                    <span>📈 3. Kasa Analizi</span>
+                    <span>→</span>
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
 </div>
 {% endblock %}

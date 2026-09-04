@@ -9,15 +9,16 @@
     ]
   },
   {
-    "username": "deniz",
-    "name": "Keleş",
-    "password_hash": "scrypt:32768:8:1$WWNVYtPYSsiffOtT$694db9457a11553cc1d2883a05827f20a77890c4b2c8543fc458bc49f2ef3b9ac098d399c4923acc69c87f6a008fa884eb404bb07cf8990fffb828b1f3d34b34",
+    "username": "ali_tunc",
+    "name": "Ali TUNÇ",
+    "password_hash": "scrypt:32768:8:1$Cr7PLr1HY2nPkLw6$062daf83e085db6697310f19fb102de6e3723135f8a98085639bfb1503c9ee79f588132ed79c936ae99b706070c83370bae7d8b822cda570c6ad964bc5f9f46e",
     "role": "user",
     "allowed_pages": [
       "index",
-      "muhasebe",
       "cari_ekstre",
-      "cari_kapama",
+      "kasa_hareketleri",
+      "kasa_raporu",
+      "kasa_analizi",
       "finans",
       "raporlar"
     ]

@@ -221,6 +221,299 @@
         font-size: 0.8rem;
         color: var(--text-muted);
     }
+
+    /* --- CANLI DÖVİZ KURLARI PANELİ --- */
+    .fx-panel-container {
+        background: linear-gradient(145deg, var(--card-bg), var(--card-bg-subtle));
+        border: 1px solid var(--border-color);
+        border-radius: 1rem;
+        padding: 1.4rem 1.6rem;
+        box-shadow: 0 10px 30px -5px var(--shadow-color);
+        display: flex;
+        flex-direction: column;
+        gap: 1.15rem;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .fx-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0.85rem;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 0.85rem;
+    }
+
+    .fx-title-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+    }
+
+    .fx-title {
+        font-size: 1.15rem;
+        font-weight: 800;
+        color: var(--text-main);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .fx-subtitle {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+
+    .fx-controls {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        flex-wrap: wrap;
+    }
+
+    .fx-live-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        background: rgba(16, 185, 129, 0.15);
+        color: #10b981;
+        border: 1px solid rgba(16, 185, 129, 0.35);
+        padding: 0.28rem 0.7rem;
+        border-radius: 2rem;
+        font-size: 0.74rem;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+    }
+
+    .fx-live-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #10b981;
+        box-shadow: 0 0 8px #10b981;
+        animation: pulseGlow 1.8s infinite;
+    }
+
+    @keyframes pulseGlow {
+        0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+        70% { transform: scale(1.1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+        100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    .fx-time-badge {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        font-family: 'Consolas', monospace;
+    }
+
+    .fx-refresh-btn {
+        background: var(--accent-light);
+        border: 1px solid var(--border-color);
+        color: var(--accent);
+        border-radius: 0.45rem;
+        padding: 0.3rem 0.7rem;
+        font-size: 0.78rem;
+        font-weight: 700;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        transition: all 0.2s ease;
+    }
+
+    .fx-refresh-btn:hover {
+        background: var(--accent);
+        color: #fff;
+        transform: translateY(-1px);
+    }
+
+    .fx-refresh-btn.spinning svg {
+        animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+
+    /* Kart Izgarası */
+    .fx-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 0.95rem;
+    }
+
+    .fx-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 0.75rem;
+        padding: 1rem 1.1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.55rem;
+        transition: all 0.25s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .fx-card:hover {
+        transform: translateY(-3px);
+        border-color: var(--accent);
+        box-shadow: 0 8px 20px -4px var(--shadow-color);
+    }
+
+    .fx-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+    }
+
+    .fx-card.usd-dzd::before { background: linear-gradient(90deg, #10b981, #f59e0b); }
+    .fx-card.eur-dzd::before { background: linear-gradient(90deg, #6366f1, #f59e0b); }
+    .fx-card.usd-try::before { background: linear-gradient(90deg, #10b981, #ef4444); }
+    .fx-card.eur-try::before { background: linear-gradient(90deg, #6366f1, #ef4444); }
+    .fx-card.dzd-try::before { background: linear-gradient(90deg, #f59e0b, #ef4444); }
+
+    .fx-card-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .fx-pair-title {
+        font-size: 0.9rem;
+        font-weight: 800;
+        color: var(--text-main);
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    .fx-flag-icon {
+        font-size: 1.15rem;
+    }
+
+    .fx-pill-tag {
+        font-size: 0.68rem;
+        font-weight: 700;
+        padding: 0.15rem 0.45rem;
+        border-radius: 0.35rem;
+        background: var(--accent-light);
+        color: var(--accent);
+        border: 1px solid var(--border-color);
+    }
+
+    .fx-rate-val {
+        font-size: 1.55rem;
+        font-weight: 900;
+        font-family: 'Consolas', monospace;
+        font-variant-numeric: tabular-nums;
+        color: var(--text-main);
+        letter-spacing: -0.02em;
+        line-height: 1.15;
+    }
+
+    .fx-rate-curr {
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: var(--text-muted);
+        margin-left: 0.25rem;
+    }
+
+    .fx-card-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        border-top: 1px dashed var(--border-color);
+        padding-top: 0.45rem;
+        margin-top: auto;
+    }
+
+    /* Hızlı Çevirici Çubuğu */
+    .fx-calc-bar {
+        background: var(--card-bg-subtle);
+        border: 1px solid var(--border-color);
+        border-radius: 0.65rem;
+        padding: 0.75rem 1rem;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.85rem;
+        font-size: 0.85rem;
+    }
+
+    .fx-calc-label {
+        font-weight: 700;
+        color: var(--text-main);
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
+    .fx-calc-inputs {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+    }
+
+    .fx-calc-input {
+        background: var(--input-bg);
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+        padding: 0.35rem 0.55rem;
+        border-radius: 0.4rem;
+        font-family: 'Consolas', monospace;
+        font-weight: 700;
+        width: 100px;
+        text-align: right;
+        font-size: 0.88rem;
+    }
+    .fx-calc-input:focus {
+        outline: none;
+        border-color: var(--accent);
+    }
+
+    .fx-calc-select {
+        background: var(--input-bg);
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+        padding: 0.35rem 0.5rem;
+        border-radius: 0.4rem;
+        font-weight: 700;
+        font-size: 0.85rem;
+        cursor: pointer;
+    }
+
+    .fx-calc-results {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        flex-wrap: wrap;
+        margin-left: auto;
+        font-family: 'Consolas', monospace;
+        font-size: 0.82rem;
+        font-weight: 700;
+    }
+
+    .fx-calc-res-item {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        padding: 0.25rem 0.6rem;
+        border-radius: 0.4rem;
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+    .fx-calc-res-item span.amount {
+        color: var(--accent);
+    }
 </style>
 
 <div class="home-container">
@@ -240,6 +533,146 @@
         <div class="hero-meta">
             <div class="clock-display" id="liveClock">--:--:--</div>
             <div class="date-display" id="liveDate">Tarih yükleniyor...</div>
+        </div>
+    </div>
+
+    <!-- 💱 CANLI DÖVİZ KURLARI (USD, EUR, CEZAYİR DİNARI, TL) -->
+    <div class="fx-panel-container">
+        <div class="fx-header">
+            <div class="fx-title-wrap">
+                <div class="fx-title">
+                    <span>💱</span>
+                    <span>Canlı Döviz Kurları</span>
+                </div>
+                <div class="fx-subtitle">USD, EUR, Cezayir Dinarı (DZD) ve Türk Lirası (TRY) anlık dinamik piyasa kurları</div>
+            </div>
+            <div class="fx-controls">
+                <span class="fx-live-badge"><span class="fx-live-dot"></span> Canlı Piyasa</span>
+                <span class="fx-time-badge" id="fx-update-time">⏳ Güncelleniyor...</span>
+                <button class="fx-refresh-btn" id="fx-refresh-btn" onclick="fetchLiveRates(true)" title="Kurları Yenile">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <polyline points="1 20 1 14 7 14"></polyline>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                    </svg>
+                    <span>Yenile</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 5 Kur Kartı -->
+        <div class="fx-grid">
+            <!-- USD / DZD -->
+            <div class="fx-card usd-dzd">
+                <div class="fx-card-top">
+                    <div class="fx-pair-title">
+                        <span class="fx-flag-icon">🇺🇸🇩🇿</span>
+                        <span>USD / DZD</span>
+                    </div>
+                    <span class="fx-pill-tag">Cezayir Dinarı</span>
+                </div>
+                <div class="fx-rate-val">
+                    <span id="fx-usd-dzd">--.--</span>
+                    <span class="fx-rate-curr">DA</span>
+                </div>
+                <div class="fx-card-footer">
+                    <span>1 USD Karşılığı</span>
+                    <span id="fx-sub-usd-dzd" style="font-weight:700;color:var(--text-main);">-- DZD</span>
+                </div>
+            </div>
+
+            <!-- EUR / DZD -->
+            <div class="fx-card eur-dzd">
+                <div class="fx-card-top">
+                    <div class="fx-pair-title">
+                        <span class="fx-flag-icon">🇪🇺🇩🇿</span>
+                        <span>EUR / DZD</span>
+                    </div>
+                    <span class="fx-pill-tag">Cezayir Dinarı</span>
+                </div>
+                <div class="fx-rate-val">
+                    <span id="fx-eur-dzd">--.--</span>
+                    <span class="fx-rate-curr">DA</span>
+                </div>
+                <div class="fx-card-footer">
+                    <span>1 EUR Karşılığı</span>
+                    <span id="fx-sub-eur-dzd" style="font-weight:700;color:var(--text-main);">-- DZD</span>
+                </div>
+            </div>
+
+            <!-- USD / TRY -->
+            <div class="fx-card usd-try">
+                <div class="fx-card-top">
+                    <div class="fx-pair-title">
+                        <span class="fx-flag-icon">🇺🇸🇹🇷</span>
+                        <span>USD / TRY</span>
+                    </div>
+                    <span class="fx-pill-tag">Dolar / TL</span>
+                </div>
+                <div class="fx-rate-val">
+                    <span>₺</span><span id="fx-usd-try">--.--</span>
+                </div>
+                <div class="fx-card-footer">
+                    <span>1 USD Karşılığı</span>
+                    <span id="fx-sub-usd-try" style="font-weight:700;color:var(--text-main);">-- TL</span>
+                </div>
+            </div>
+
+            <!-- EUR / TRY -->
+            <div class="fx-card eur-try">
+                <div class="fx-card-top">
+                    <div class="fx-pair-title">
+                        <span class="fx-flag-icon">🇪🇺🇹🇷</span>
+                        <span>EUR / TRY</span>
+                    </div>
+                    <span class="fx-pill-tag">Euro / TL</span>
+                </div>
+                <div class="fx-rate-val">
+                    <span>₺</span><span id="fx-eur-try">--.--</span>
+                </div>
+                <div class="fx-card-footer">
+                    <span>1 EUR Karşılığı</span>
+                    <span id="fx-sub-eur-try" style="font-weight:700;color:var(--text-main);">-- TL</span>
+                </div>
+            </div>
+
+            <!-- DZD / TRY (Çapraz) -->
+            <div class="fx-card dzd-try">
+                <div class="fx-card-top">
+                    <div class="fx-pair-title">
+                        <span class="fx-flag-icon">🇩🇿🇹🇷</span>
+                        <span>DZD / TRY</span>
+                    </div>
+                    <span class="fx-pill-tag">Çapraz Kur</span>
+                </div>
+                <div class="fx-rate-val">
+                    <span>₺</span><span id="fx-dzd-try">--.---</span>
+                </div>
+                <div class="fx-card-footer">
+                    <span>1 DA Karşılığı</span>
+                    <span id="fx-sub-dzd-try" style="font-weight:700;color:var(--text-main);">-- ₺</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Canlı Hızlı Çevirici Çubuğu -->
+        <div class="fx-calc-bar">
+            <div class="fx-calc-label">
+                <span>⚡</span>
+                <span>Hızlı Çevirici:</span>
+            </div>
+            <div class="fx-calc-inputs">
+                <input type="number" id="calcAmount" class="fx-calc-input" value="1000" min="0" step="any" oninput="recalcFx()">
+                <select id="calcBase" class="fx-calc-select" onchange="recalcFx()">
+                    <option value="USD">USD ($)</option>
+                    <option value="EUR">EUR (€)</option>
+                    <option value="DZD" selected>DZD (DA)</option>
+                    <option value="TRY">TRY (₺)</option>
+                </select>
+            </div>
+            <div class="fx-calc-results" id="calcResults">
+                <!-- Dinamik Sonuçlar -->
+            </div>
         </div>
     </div>
 
@@ -414,5 +847,101 @@
 
     setInterval(updateClock, 1000);
     updateClock();
+
+    // ── CANLI DÖVİZ KURLARI YÖNETİMİ ──
+    let latestFxRates = null;
+
+    async function fetchLiveRates(force = false) {
+        const btn = document.getElementById('fx-refresh-btn');
+        const timeEl = document.getElementById('fx-update-time');
+        if (btn) btn.classList.add('spinning');
+
+        try {
+            const url = '/api/doviz-kurlari' + (force ? '?force=1' : '');
+            const res = await fetch(url);
+            const data = await res.json();
+
+            if (data && data.rates) {
+                latestFxRates = data.rates;
+                const r = data.rates;
+
+                // USD / DZD
+                setTxt('fx-usd-dzd', fmtFx(r.USD_DZD, 2));
+                setTxt('fx-sub-usd-dzd', fmtFx(r.USD_DZD, 4) + ' DZD');
+
+                // EUR / DZD
+                setTxt('fx-eur-dzd', fmtFx(r.EUR_DZD, 2));
+                setTxt('fx-sub-eur-dzd', fmtFx(r.EUR_DZD, 4) + ' DZD');
+
+                // USD / TRY
+                setTxt('fx-usd-try', fmtFx(r.USD_TRY, 2));
+                setTxt('fx-sub-usd-try', fmtFx(r.USD_TRY, 4) + ' TL');
+
+                // EUR / TRY
+                setTxt('fx-eur-try', fmtFx(r.EUR_TRY, 2));
+                setTxt('fx-sub-eur-try', fmtFx(r.EUR_TRY, 4) + ' TL');
+
+                // DZD / TRY
+                setTxt('fx-dzd-try', fmtFx(r.DZD_TRY, 3));
+                setTxt('fx-sub-dzd-try', fmtFx(r.DZD_TRY, 4) + ' ₺');
+
+                if (timeEl) {
+                    timeEl.textContent = 'Son: ' + (data.updated_at || new Date().toLocaleTimeString('tr-TR'));
+                }
+
+                recalcFx();
+            }
+        } catch (e) {
+            console.error('Döviz kuru yükleme hatası:', e);
+            if (timeEl) timeEl.textContent = 'Bağlantı hatası';
+        } finally {
+            if (btn) {
+                setTimeout(() => btn.classList.remove('spinning'), 400);
+            }
+        }
+    }
+
+    function setTxt(id, val) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+    }
+
+    function fmtFx(num, dec = 2) {
+        if (num === null || num === undefined || isNaN(num)) return '--';
+        return Number(num).toLocaleString('tr-TR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+    }
+
+    function recalcFx() {
+        if (!latestFxRates) return;
+        const amount = parseFloat(document.getElementById('calcAmount').value) || 0;
+        const base = document.getElementById('calcBase').value;
+        const resEl = document.getElementById('calcResults');
+        if (!resEl) return;
+
+        const r = latestFxRates;
+        // Girdiyi önce USD bazına çevir
+        let inUsd = 0;
+        if (base === 'USD') inUsd = amount;
+        else if (base === 'EUR') inUsd = amount * (r.EUR_USD || (r.EUR_TRY / r.USD_TRY));
+        else if (base === 'DZD') inUsd = amount / r.USD_DZD;
+        else if (base === 'TRY') inUsd = amount / r.USD_TRY;
+
+        const targetDzd = inUsd * r.USD_DZD;
+        const targetTry = inUsd * r.USD_TRY;
+        const targetUsd = inUsd;
+        const targetEur = inUsd * (1.0 / (r.EUR_USD || 1.162));
+
+        let items = [];
+        if (base !== 'DZD') items.push(`<div class="fx-calc-res-item">🇩🇿 <span class="amount">${fmtFx(targetDzd, 2)}</span> DA</div>`);
+        if (base !== 'USD') items.push(`<div class="fx-calc-res-item">🇺🇸 <span class="amount">${fmtFx(targetUsd, 2)}</span> $</div>`);
+        if (base !== 'EUR') items.push(`<div class="fx-calc-res-item">🇪🇺 <span class="amount">${fmtFx(targetEur, 2)}</span> €</div>`);
+        if (base !== 'TRY') items.push(`<div class="fx-calc-res-item">🇹🇷 <span class="amount">${fmtFx(targetTry, 2)}</span> ₺</div>`);
+
+        resEl.innerHTML = items.join('');
+    }
+
+    // İlk yükleme ve her 60 saniyede bir otomatik canlı güncelleme
+    fetchLiveRates();
+    setInterval(() => fetchLiveRates(false), 60000);
 </script>
 {% endblock %}

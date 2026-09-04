@@ -5,34 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Yönetim Paneli{% endblock %}</title>
     <script>
-        // Tema Tercihini Sayfa Yüklenmeden Uygula (Flicker Önleme)
+        // Tema ve Çözünürlük/Netlik Tercihini Sayfa Yüklenmeden Uygula (Flicker Önleme)
         (function() {
             const savedTheme = localStorage.getItem('app_theme') || 'default';
             document.documentElement.setAttribute('data-theme', savedTheme);
-        })();
-
-        // Sekme / Sayfa Kapanma Doğrulaması (Tab Session Handshake)
-        (function() {
-            const serverToken = "{{ session_tab_token }}";
-            const isFresh = {{ 'true' if is_fresh_login else 'false' }};
-            if (serverToken) {
-                if (isFresh) {
-                    sessionStorage.setItem('active_tab_token', serverToken);
-                } else {
-                    const storedToken = sessionStorage.getItem('active_tab_token');
-                    if (!storedToken || storedToken !== serverToken) {
-                        // Sekme veya sayfa 'X' ile kapatılmış, yeni sekmede/pencerede açılmış
-                        sessionStorage.removeItem('active_tab_token');
-                        window.location.replace('/logout?timeout=1');
-                    }
-                }
-            }
+            const savedZoom = localStorage.getItem('app_zoom') || '1.08';
+            document.documentElement.style.zoom = savedZoom;
         })();
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         /* ========================================================= */
-        /* TEMA TANIMLAMALARI (8 FARKLI ZENGİN VE OKUNABİLİR MOD)   */
+        /* TEMA TANIMLAMALARI (8 FARKLI ZENGİN VE YÜKSEK KONTRASTLI) */
         /* ========================================================= */
 
         /* 1. Gece Mavisi (Varsayılan - Dark Slate Navy) */
@@ -52,6 +36,21 @@
             --shadow-color: rgba(0, 0, 0, 0.35);
             --badge-bg: rgba(59, 130, 246, 0.15);
             --badge-text: #60a5fa;
+            --badge-giris-bg: rgba(16, 185, 129, 0.22);
+            --badge-giris-text: #34d399;
+            --badge-giris-border: rgba(16, 185, 129, 0.45);
+            --badge-cikis-bg: rgba(244, 63, 94, 0.22);
+            --badge-cikis-text: #fda4af;
+            --badge-cikis-border: rgba(244, 63, 94, 0.45);
+            --badge-virman-bg: rgba(6, 182, 212, 0.22);
+            --badge-virman-text: #38bdf8;
+            --badge-virman-border: rgba(6, 182, 212, 0.45);
+            --badge-acilis-bg: rgba(99, 102, 241, 0.22);
+            --badge-acilis-text: #a5b4fc;
+            --badge-acilis-border: rgba(99, 102, 241, 0.45);
+            --badge-neutral-bg: rgba(148, 163, 184, 0.2);
+            --badge-neutral-text: #e2e8f0;
+            --badge-neutral-border: rgba(148, 163, 184, 0.4);
             --theme-name: 'Gece Mavisi';
         }
 
@@ -72,6 +71,21 @@
             --shadow-color: rgba(0, 0, 0, 0.6);
             --badge-bg: rgba(6, 182, 212, 0.15);
             --badge-text: #22d3ee;
+            --badge-giris-bg: rgba(16, 185, 129, 0.25);
+            --badge-giris-text: #4ade80;
+            --badge-giris-border: rgba(16, 185, 129, 0.5);
+            --badge-cikis-bg: rgba(244, 63, 94, 0.25);
+            --badge-cikis-text: #fb7185;
+            --badge-cikis-border: rgba(244, 63, 94, 0.5);
+            --badge-virman-bg: rgba(6, 182, 212, 0.25);
+            --badge-virman-text: #22d3ee;
+            --badge-virman-border: rgba(6, 182, 212, 0.5);
+            --badge-acilis-bg: rgba(99, 102, 241, 0.25);
+            --badge-acilis-text: #818cf8;
+            --badge-acilis-border: rgba(99, 102, 241, 0.5);
+            --badge-neutral-bg: rgba(255, 255, 255, 0.12);
+            --badge-neutral-text: #f4f4f5;
+            --badge-neutral-border: rgba(255, 255, 255, 0.25);
             --theme-name: 'OLED Siyah';
         }
 
@@ -92,6 +106,21 @@
             --shadow-color: rgba(0, 0, 0, 0.4);
             --badge-bg: rgba(16, 185, 129, 0.15);
             --badge-text: #34d399;
+            --badge-giris-bg: rgba(16, 185, 129, 0.25);
+            --badge-giris-text: #6ee7b7;
+            --badge-giris-border: rgba(16, 185, 129, 0.5);
+            --badge-cikis-bg: rgba(244, 63, 94, 0.22);
+            --badge-cikis-text: #fca5a5;
+            --badge-cikis-border: rgba(244, 63, 94, 0.45);
+            --badge-virman-bg: rgba(20, 184, 166, 0.22);
+            --badge-virman-text: #5eead4;
+            --badge-virman-border: rgba(20, 184, 166, 0.45);
+            --badge-acilis-bg: rgba(59, 130, 246, 0.22);
+            --badge-acilis-text: #93c5fd;
+            --badge-acilis-border: rgba(59, 130, 246, 0.45);
+            --badge-neutral-bg: rgba(148, 163, 184, 0.2);
+            --badge-neutral-text: #e2e8f0;
+            --badge-neutral-border: rgba(148, 163, 184, 0.4);
             --theme-name: 'Zümrüt Yeşili';
         }
 
@@ -112,6 +141,21 @@
             --shadow-color: rgba(0, 0, 0, 0.45);
             --badge-bg: rgba(168, 85, 247, 0.15);
             --badge-text: #c084fc;
+            --badge-giris-bg: rgba(16, 185, 129, 0.22);
+            --badge-giris-text: #4ade80;
+            --badge-giris-border: rgba(16, 185, 129, 0.45);
+            --badge-cikis-bg: rgba(244, 63, 94, 0.22);
+            --badge-cikis-text: #f472b6;
+            --badge-cikis-border: rgba(244, 63, 94, 0.45);
+            --badge-virman-bg: rgba(168, 85, 247, 0.22);
+            --badge-virman-text: #c084fc;
+            --badge-virman-border: rgba(168, 85, 247, 0.45);
+            --badge-acilis-bg: rgba(99, 102, 241, 0.22);
+            --badge-acilis-text: #a5b4fc;
+            --badge-acilis-border: rgba(99, 102, 241, 0.45);
+            --badge-neutral-bg: rgba(148, 163, 184, 0.2);
+            --badge-neutral-text: #e2e8f0;
+            --badge-neutral-border: rgba(148, 163, 184, 0.4);
             --theme-name: 'Gece Moru';
         }
 
@@ -132,6 +176,21 @@
             --shadow-color: rgba(0, 0, 0, 0.4);
             --badge-bg: rgba(245, 158, 11, 0.15);
             --badge-text: #fbbf24;
+            --badge-giris-bg: rgba(16, 185, 129, 0.22);
+            --badge-giris-text: #34d399;
+            --badge-giris-border: rgba(16, 185, 129, 0.45);
+            --badge-cikis-bg: rgba(244, 63, 94, 0.22);
+            --badge-cikis-text: #f87171;
+            --badge-cikis-border: rgba(244, 63, 94, 0.45);
+            --badge-virman-bg: rgba(245, 158, 11, 0.22);
+            --badge-virman-text: #fbbf24;
+            --badge-virman-border: rgba(245, 158, 11, 0.45);
+            --badge-acilis-bg: rgba(59, 130, 246, 0.22);
+            --badge-acilis-text: #93c5fd;
+            --badge-acilis-border: rgba(59, 130, 246, 0.45);
+            --badge-neutral-bg: rgba(148, 163, 184, 0.2);
+            --badge-neutral-text: #e2e8f0;
+            --badge-neutral-border: rgba(148, 163, 184, 0.4);
             --theme-name: 'Sıcak Kehribar';
         }
 
@@ -152,6 +211,21 @@
             --shadow-color: rgba(0, 0, 0, 0.4);
             --badge-bg: rgba(20, 184, 166, 0.15);
             --badge-text: #2dd4bf;
+            --badge-giris-bg: rgba(20, 184, 166, 0.25);
+            --badge-giris-text: #2dd4bf;
+            --badge-giris-border: rgba(20, 184, 166, 0.5);
+            --badge-cikis-bg: rgba(244, 63, 94, 0.22);
+            --badge-cikis-text: #fb7185;
+            --badge-cikis-border: rgba(244, 63, 94, 0.45);
+            --badge-virman-bg: rgba(6, 182, 212, 0.22);
+            --badge-virman-text: #38bdf8;
+            --badge-virman-border: rgba(6, 182, 212, 0.45);
+            --badge-acilis-bg: rgba(59, 130, 246, 0.22);
+            --badge-acilis-text: #93c5fd;
+            --badge-acilis-border: rgba(59, 130, 246, 0.45);
+            --badge-neutral-bg: rgba(148, 163, 184, 0.2);
+            --badge-neutral-text: #e2e8f0;
+            --badge-neutral-border: rgba(148, 163, 184, 0.4);
             --theme-name: 'Kutup Okyanusu';
         }
 
@@ -172,26 +246,56 @@
             --shadow-color: rgba(0, 0, 0, 0.45);
             --badge-bg: rgba(244, 63, 94, 0.15);
             --badge-text: #fb7185;
+            --badge-giris-bg: rgba(16, 185, 129, 0.22);
+            --badge-giris-text: #4ade80;
+            --badge-giris-border: rgba(16, 185, 129, 0.45);
+            --badge-cikis-bg: rgba(244, 63, 94, 0.25);
+            --badge-cikis-text: #fda4af;
+            --badge-cikis-border: rgba(244, 63, 94, 0.5);
+            --badge-virman-bg: rgba(6, 182, 212, 0.22);
+            --badge-virman-text: #38bdf8;
+            --badge-virman-border: rgba(6, 182, 212, 0.45);
+            --badge-acilis-bg: rgba(244, 63, 94, 0.22);
+            --badge-acilis-text: #fca5a5;
+            --badge-acilis-border: rgba(244, 63, 94, 0.45);
+            --badge-neutral-bg: rgba(148, 163, 184, 0.2);
+            --badge-neutral-text: #e2e8f0;
+            --badge-neutral-border: rgba(148, 163, 184, 0.4);
             --theme-name: 'Kızıl Yakut';
         }
 
         /* 8. Modern Aydınlık (Temiz Beyaz & Yüksek Kontrastlı Açık Mod) */
         [data-theme="light-modern"] {
-            --bg-color: #f1f5f9;
+            --bg-color: #f8fafc;
             --card-bg: #ffffff;
-            --card-bg-subtle: #f8fafc;
+            --card-bg-subtle: #f1f5f9;
             --input-bg: #ffffff;
-            --text-main: #0f172a;
-            --text-muted: #475569;
+            --text-main: #090d16; /* Ultra keskin siyah / koyu lacivert */
+            --text-muted: #334155; /* Kolay okunan koyu gri/slate */
             --accent: #2563eb;
             --accent-hover: #1d4ed8;
-            --accent-light: rgba(37, 99, 235, 0.1);
+            --accent-light: rgba(37, 99, 235, 0.12);
             --border-color: #cbd5e1;
             --table-stripe: #f8fafc;
             --table-hover: #e2e8f0;
             --shadow-color: rgba(0, 0, 0, 0.08);
-            --badge-bg: rgba(37, 99, 235, 0.1);
+            --badge-bg: #dbeafe;
             --badge-text: #1d4ed8;
+            --badge-giris-bg: #dcfce7;
+            --badge-giris-text: #14532d; /* Ultra yüksek kontrast koyu yeşil */
+            --badge-giris-border: #86efac;
+            --badge-cikis-bg: #fee2e2;
+            --badge-cikis-text: #7f1d1d; /* Ultra yüksek kontrast koyu kırmızı */
+            --badge-cikis-border: #fca5a5;
+            --badge-virman-bg: #e0f2fe;
+            --badge-virman-text: #0369a1; /* Ultra yüksek kontrast koyu mavi */
+            --badge-virman-border: #7dd3fc;
+            --badge-acilis-bg: #ede9fe;
+            --badge-acilis-text: #4338ca; /* Ultra yüksek kontrast koyu indigo */
+            --badge-acilis-border: #c7d2fe;
+            --badge-neutral-bg: #f1f5f9;
+            --badge-neutral-text: #1e293b;
+            --badge-neutral-border: #cbd5e1;
             --theme-name: 'Modern Aydınlık';
         }
 
@@ -212,23 +316,96 @@
             --shadow-color: rgba(0, 0, 0, 0.5);
             --badge-bg: rgba(34, 197, 94, 0.15);
             --badge-text: #4ade80;
+            --badge-giris-bg: rgba(34, 197, 94, 0.25);
+            --badge-giris-text: #86efac;
+            --badge-giris-border: rgba(34, 197, 94, 0.5);
+            --badge-cikis-bg: rgba(244, 63, 94, 0.22);
+            --badge-cikis-text: #fca5a5;
+            --badge-cikis-border: rgba(244, 63, 94, 0.45);
+            --badge-virman-bg: rgba(34, 197, 94, 0.2);
+            --badge-virman-text: #4ade80;
+            --badge-virman-border: rgba(34, 197, 94, 0.4);
+            --badge-acilis-bg: rgba(34, 197, 94, 0.2);
+            --badge-acilis-text: #bbf7d0;
+            --badge-acilis-border: rgba(34, 197, 94, 0.4);
+            --badge-neutral-bg: rgba(148, 163, 184, 0.2);
+            --badge-neutral-text: #e2e8f0;
+            --badge-neutral-border: rgba(148, 163, 184, 0.4);
             --theme-name: 'Matrix Terminal';
+        }
+
+        html {
+            font-size: 15.5px;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
+            font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+            -webkit-text-size-adjust: 100%;
         }
 
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            transition: background-color 0.25s ease, border-color 0.25s ease, color 0.2s ease;
+            transition: background-color 0.2s ease, border-color 0.2s ease, color 0.15s ease;
         }
 
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             background-color: var(--bg-color);
             color: var(--text-main);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            line-height: 1.5;
+            letter-spacing: -0.01em;
+        }
+
+        /* --- Ultra Net, Yüksek Kontrastlı Global Rozet Standartları --- */
+        .badge-islem {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 3px 9px;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            line-height: 1.25;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+            border: 1px solid transparent;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+            transition: all 0.2s ease;
+        }
+
+        .badge-islem-giris {
+            background-color: var(--badge-giris-bg);
+            color: var(--badge-giris-text) !important;
+            border-color: var(--badge-giris-border);
+        }
+
+        .badge-islem-cikis {
+            background-color: var(--badge-cikis-bg);
+            color: var(--badge-cikis-text) !important;
+            border-color: var(--badge-cikis-border);
+        }
+
+        .badge-islem-virman {
+            background-color: var(--badge-virman-bg);
+            color: var(--badge-virman-text) !important;
+            border-color: var(--badge-virman-border);
+        }
+
+        .badge-islem-acilis {
+            background-color: var(--badge-acilis-bg);
+            color: var(--badge-acilis-text) !important;
+            border-color: var(--badge-acilis-border);
+        }
+
+        .badge-islem-neutral {
+            background-color: var(--badge-neutral-bg);
+            color: var(--badge-neutral-text) !important;
+            border-color: var(--badge-neutral-border);
         }
 
         header {
@@ -301,17 +478,46 @@
             box-shadow: 0 10px 25px -5px var(--shadow-color);
         }
 
+        h1, h2, h3, h4, h5, h6 {
+            color: var(--text-main);
+            letter-spacing: -0.02em;
+        }
+
         h1 {
             font-size: 1.75rem;
             font-weight: 800;
             margin-bottom: 0.75rem;
-            color: var(--text-main);
-            letter-spacing: -0.02em;
         }
 
         p {
             color: var(--text-muted);
             line-height: 1.6;
+        }
+
+        /* Global Form & Okunabilir Metin Kontrast Standartları */
+        .form-control, input[type="text"], input[type="password"], input[type="number"], input[type="date"], select, textarea {
+            background-color: var(--input-bg);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+        }
+
+        .form-control::placeholder, input::placeholder, textarea::placeholder {
+            color: var(--text-muted);
+            opacity: 0.85;
+        }
+
+        .form-label {
+            color: var(--text-main);
+            font-weight: 600;
+        }
+
+        code {
+            background: var(--card-bg-subtle);
+            color: var(--accent);
+            border: 1px solid var(--border-color);
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.85em;
         }
 
         .header-right {
@@ -357,12 +563,22 @@
             min-width: 210px;
             box-shadow: 0 12px 30px -5px var(--shadow-color);
             z-index: 50;
-            overflow: hidden;
+            overflow: visible;
         }
 
         .nav-dropdown-menu.show {
             display: block !important;
             animation: fadeIn 0.15s ease-out;
+        }
+
+        .nav-dropdown-menu > a:first-child {
+            border-top-left-radius: 0.65rem;
+            border-top-right-radius: 0.65rem;
+        }
+
+        .nav-dropdown-menu > a:last-child {
+            border-bottom-left-radius: 0.65rem;
+            border-bottom-right-radius: 0.65rem;
         }
 
         .nav-dropdown-menu a {
@@ -383,6 +599,131 @@
             background-color: var(--accent-light);
             color: var(--accent);
             padding-left: 1.25rem;
+        }
+
+        /* --- KASA SAĞA AÇILAN ALT MENÜSÜ --- */
+        .nav-sub-dropdown {
+            position: relative;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .nav-sub-toggle {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.65rem 1rem;
+            color: var(--text-main);
+            background: none;
+            border: none;
+            font-family: inherit;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.15s ease;
+        }
+
+        .nav-sub-toggle:hover,
+        .nav-sub-dropdown:hover > .nav-sub-toggle {
+            background-color: var(--accent-light);
+            color: var(--accent);
+            padding-left: 1.25rem;
+        }
+
+        .nav-sub-toggle.active {
+            color: var(--accent);
+            font-weight: 600;
+            background-color: rgba(16, 185, 129, 0.08);
+        }
+
+        .nav-sub-toggle #kasaArrow {
+            transition: transform 0.2s ease, color 0.2s ease;
+        }
+
+        .nav-sub-toggle:hover #kasaArrow,
+        .nav-sub-dropdown:hover #kasaArrow,
+        .nav-sub-toggle.active #kasaArrow {
+            transform: translateX(3px);
+            color: var(--accent);
+        }
+
+        .nav-sub-menu {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: calc(100% - 1px);
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0.65rem;
+            min-width: 210px;
+            box-shadow: 0 12px 30px -5px var(--shadow-color);
+            z-index: 60;
+        }
+
+        /* Mouse geçişi için görünmez köprü */
+        .nav-sub-dropdown::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: -10px;
+            width: 10px;
+            height: 100%;
+        }
+
+        /* Sağa doğru açılma: Hover veya Click (.show) */
+        .nav-sub-dropdown:hover > .nav-sub-menu,
+        .nav-sub-menu.show {
+            display: block !important;
+            animation: fadeInRight 0.15s ease-out;
+        }
+
+        .nav-sub-menu a {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.65rem 1rem !important;
+            color: var(--text-main) !important;
+            font-size: 0.85rem !important;
+            font-weight: 500;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.15s ease;
+            text-decoration: none;
+            border-radius: 0;
+        }
+
+        .nav-sub-menu a:first-child {
+            border-top-left-radius: 0.65rem;
+            border-top-right-radius: 0.65rem;
+        }
+
+        .nav-sub-menu a:last-child {
+            border-bottom-left-radius: 0.65rem;
+            border-bottom-right-radius: 0.65rem;
+            border-bottom: none;
+        }
+
+        .nav-sub-menu a:hover {
+            color: var(--accent) !important;
+            background-color: var(--accent-light) !important;
+            padding-left: 1.25rem !important;
+        }
+
+        .nav-sub-menu a.active-sub {
+            color: var(--accent) !important;
+            font-weight: 600;
+            background-color: var(--accent-light) !important;
+        }
+
+        @keyframes fadeInRight {
+            from {
+                opacity: 0;
+                transform: translateX(-6px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
         }
 
         /* --- TEK TIKLA DEĞİŞEN TEMA BUTONU (HEADER SAĞ ÜST) --- */
@@ -510,11 +851,119 @@
             from { opacity: 0; transform: translateY(-4px); }
             to { opacity: 1; transform: translateY(0); }
         }
+
+        /* --- HEADER CANLI DÖVİZ KURLARI TEK SATIR --- */
+        .nav-fx-ticker {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-left: 0.5rem;
+            padding: 0.2rem 0.6rem;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-color);
+            border-radius: 2rem;
+            white-space: nowrap;
+            font-size: 0.76rem;
+            font-family: 'Consolas', monospace;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.15);
+        }
+
+        .nav-fx-live {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            color: #10b981;
+            font-weight: 800;
+            font-size: 0.7rem;
+            padding-right: 0.4rem;
+            border-right: 1px solid var(--border-color);
+        }
+
+        .nav-fx-live-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #10b981;
+            box-shadow: 0 0 6px #10b981;
+            animation: pulseNavDot 1.8s infinite;
+        }
+
+        @keyframes pulseNavDot {
+            0% { transform: scale(0.9); opacity: 0.8; }
+            50% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(0.9); opacity: 0.8; }
+        }
+
+        .nav-fx-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.15rem 0.35rem;
+            border-radius: 0.35rem;
+            transition: background 0.15s;
+            cursor: default;
+        }
+
+        .nav-fx-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .nav-fx-flag {
+            font-size: 0.85rem;
+            line-height: 1;
+        }
+
+        .nav-fx-code {
+            color: var(--text-muted);
+            font-weight: 700;
+            font-size: 0.72rem;
+        }
+
+        .nav-fx-val {
+            color: var(--text-main);
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .nav-fx-val.accent-dzd {
+            color: #fbbf24;
+        }
+
+        .nav-fx-val.accent-try {
+            color: #38bdf8;
+        }
+
+        .nav-fx-refresh {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 0.15rem 0.25rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: color 0.15s, transform 0.2s;
+        }
+
+        .nav-fx-refresh:hover {
+            color: var(--accent);
+            transform: scale(1.1);
+        }
+
+        .nav-fx-refresh.spinning svg {
+            animation: spinNavFx 0.8s linear infinite;
+        }
+
+        @keyframes spinNavFx {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
     <header>
-        <div style="display: flex; align-items: center; gap: 1.75rem;">
+        <div style="display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap;">
             <a href="/" class="logo">⚡ Finans & Muhasebe Paneli</a>
             <nav>
                 <ul>
@@ -526,9 +975,9 @@
                     <li><a href="/muhasebe" class="{% if aktif_sayfa == 'muhasebe' %}active{% endif %}">📑 Muhasebe</a></li>
                     {% endif %}
 
-                    {% if has_permission('finans') or has_permission('cari_ekstre') or has_permission('cari_kapama') or has_permission('nakit_akis') %}
+                    {% if has_permission('finans') or has_permission('cari_ekstre') or has_permission('cari_kapama') or has_permission('nakit_akis') or has_permission('tahsilat_takip') or has_permission('kasa_raporu') or has_permission('kasa_hareketleri') or has_permission('kasa_analizi') %}
                     <li class="nav-dropdown" id="finansDropdown">
-                        <button type="button" class="nav-dropdown-toggle {% if aktif_sayfa in ['finans', 'cari_ekstre', 'cari_kapama', 'nakit_akis'] %}active{% endif %}" id="finansBtn" onclick="toggleFinansDropdown(event)">
+                        <button type="button" class="nav-dropdown-toggle {% if aktif_sayfa in ['finans', 'cari_ekstre', 'cari_kapama', 'nakit_akis', 'tahsilat_takip', 'kasa_raporu', 'kasa_hareketleri', 'kasa_analizi'] %}active{% endif %}" id="finansBtn" onclick="toggleFinansDropdown(event)">
                             <span>💳 Finans</span>
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <polyline points="6 9 12 15 18 9"></polyline>
@@ -547,12 +996,47 @@
                                 <span>Cari Hesap Kapama</span>
                             </a>
                             {% endif %}
+                            {% if has_permission('tahsilat_takip') %}
+                            <a href="/finans/tahsilat-takip">
+                                <span style="font-size: 1.1rem;">📋</span>
+                                <span>Tahsilat Takip</span>
+                            </a>
+                            {% endif %}
                             {% if has_permission('nakit_akis') %}
                             <a href="/finans/nakit-akis">
                                 <span style="font-size: 1.1rem;">💵</span>
                                 <span>Nakit Akış</span>
                             </a>
                             {% endif %}
+                            <!-- Kasa Grubu (1. Kasa Hareketleri, 2. Kasa Raporu, 3. Kasa Analizi) -->
+                            {% if has_permission('kasa_raporu') or has_permission('kasa_hareketleri') or has_permission('kasa_analizi') %}
+                            <div class="nav-sub-dropdown" id="kasaSubDropdown">
+                                <button type="button" class="nav-sub-toggle {% if aktif_sayfa in ['kasa_hareketleri', 'kasa_raporu', 'kasa_analizi'] %}active{% endif %}" id="kasaSubBtn" onclick="toggleKasaSub(event)">
+                                    <span style="display: flex; align-items: center; gap: 0.6rem;">
+                                        <span style="font-size: 1.1rem;">💰</span>
+                                        <span>Kasa</span>
+                                    </span>
+                                    <svg id="kasaArrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="9 18 15 12 9 6"></polyline>
+                                    </svg>
+                                </button>
+                                <div class="nav-sub-menu" id="kasaSubMenu">
+                                    <a href="/kasa-hareketleri" class="{% if aktif_sayfa == 'kasa_hareketleri' %}active-sub{% endif %}">
+                                        <span>📋</span>
+                                        <span>1. Kasa Hareketleri</span>
+                                    </a>
+                                    <a href="/finans/kasa-raporu" class="{% if aktif_sayfa == 'kasa_raporu' %}active-sub{% endif %}">
+                                        <span>📊</span>
+                                        <span>2. Kasa Raporu</span>
+                                    </a>
+                                    <a href="/finans/kasa-analizi" class="{% if aktif_sayfa == 'kasa_analizi' %}active-sub{% endif %}">
+                                        <span>📈</span>
+                                        <span>3. Kasa Analizi</span>
+                                    </a>
+                                </div>
+                            </div>
+                            {% endif %}
+
                             {% if has_permission('finans') %}
                             <a href="/finans">
                                 <span style="font-size: 1.1rem;">📊</span>
@@ -568,9 +1052,69 @@
                     {% endif %}
                 </ul>
             </nav>
+
+            <!-- 💱 RAPORDAN HEMEN SONRA TEK SATIR CANLI DÖVİZ KURLARI -->
+            <div class="nav-fx-ticker" id="navFxTicker" title="Canlı Piyasa Kurları">
+                <span class="nav-fx-live"><span class="nav-fx-live-dot"></span> CANLI</span>
+
+                <!-- USD / DZD -->
+                <div class="nav-fx-item" title="1 USD = Cezayir Dinarı">
+                    <span class="nav-fx-flag">🇺🇸🇩🇿</span>
+                    <span class="nav-fx-code">USD:</span>
+                    <span class="nav-fx-val accent-dzd" id="nav-usd-dzd">--.--</span>
+                    <span style="font-size:0.66rem;color:var(--text-muted);">DA</span>
+                </div>
+
+                <!-- EUR / DZD -->
+                <div class="nav-fx-item" title="1 EUR = Cezayir Dinarı">
+                    <span class="nav-fx-flag">🇪🇺🇩🇿</span>
+                    <span class="nav-fx-code">EUR:</span>
+                    <span class="nav-fx-val accent-dzd" id="nav-eur-dzd">--.--</span>
+                    <span style="font-size:0.66rem;color:var(--text-muted);">DA</span>
+                </div>
+
+                <!-- USD / TRY -->
+                <div class="nav-fx-item" title="1 USD = Türk Lirası">
+                    <span class="nav-fx-flag">🇺🇸🇹🇷</span>
+                    <span class="nav-fx-code">USD:</span>
+                    <span class="nav-fx-val accent-try" id="nav-usd-try">--.--</span>
+                    <span style="font-size:0.66rem;color:var(--text-muted);">₺</span>
+                </div>
+
+                <!-- EUR / TRY -->
+                <div class="nav-fx-item" title="1 EUR = Türk Lirası">
+                    <span class="nav-fx-flag">🇪🇺🇹🇷</span>
+                    <span class="nav-fx-code">EUR:</span>
+                    <span class="nav-fx-val accent-try" id="nav-eur-try">--.--</span>
+                    <span style="font-size:0.66rem;color:var(--text-muted);">₺</span>
+                </div>
+
+                <!-- DZD / TRY -->
+                <div class="nav-fx-item" title="1 Cezayir Dinarı = Türk Lirası">
+                    <span class="nav-fx-flag">🇩🇿🇹🇷</span>
+                    <span class="nav-fx-code">DZD:</span>
+                    <span class="nav-fx-val" id="nav-dzd-try">--.--</span>
+                    <span style="font-size:0.66rem;color:var(--text-muted);">₺</span>
+                </div>
+
+                <!-- Yenile Butonu -->
+                <button type="button" class="nav-fx-refresh" id="navFxRefreshBtn" onclick="fetchNavRates(true)" title="Kurları Şimdi Yenile">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <polyline points="1 20 1 14 7 14"></polyline>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                    </svg>
+                </button>
+            </div>
         </div>
 
         <div class="header-right">
+            <!-- 🔍 ÇÖZÜNÜRLÜK & NETLİK (ZOOM) BUTONU -->
+            <button type="button" class="theme-cycle-btn" id="zoomToggleBtn" onclick="cycleNextZoom(event)" title="Ekran Çözünürlüğünü ve Netliğini Yükselt (%100 / %110 / %120)">
+                <span id="zoomToggleIcon">🔎</span>
+                <span id="zoomToggleLabel">%110 Netlik</span>
+            </button>
+
             <!-- 🎨 TEK TIKLA DEĞİŞEN TEMA BUTONU -->
             <button type="button" class="theme-cycle-btn" id="themeCycleBtn" onclick="cycleNextTheme(event)" title="Görünüm Modunu Değiştir (Her tıklamada bir sonraki moda geçer)">
                 <span id="themeCycleIcon">🌙</span>
@@ -687,10 +1231,48 @@
             }
         }
 
-        // Sayfa yüklendiğinde UI etiketini ayarla
+        // --- ÇÖZÜNÜRLÜK & NETLİK (ZOOM) YÖNETİMİ ---
+        const APP_ZOOM_LEVELS = [
+            { scale: '1.0', label: '%100 Standart', icon: '🔍' },
+            { scale: '1.08', label: '%110 Yüksek', icon: '🔎' },
+            { scale: '1.18', label: '%120 Ultra Net', icon: '✨' }
+        ];
+
+        function cycleNextZoom(e) {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            const currentZoom = localStorage.getItem('app_zoom') || '1.08';
+            let currentIndex = APP_ZOOM_LEVELS.findIndex(z => z.scale === currentZoom);
+            if (currentIndex === -1) currentIndex = 1;
+            const nextIndex = (currentIndex + 1) % APP_ZOOM_LEVELS.length;
+            const nextZoom = APP_ZOOM_LEVELS[nextIndex];
+
+            setAppZoom(nextZoom.scale);
+            showGlobalThemeToast(`${nextZoom.icon} Çözünürlük Seviyesi: ${nextZoom.label}`);
+        }
+
+        function setAppZoom(scale) {
+            document.documentElement.style.zoom = scale;
+            localStorage.setItem('app_zoom', scale);
+            updateZoomUI(scale);
+        }
+
+        function updateZoomUI(scale) {
+            const zoomObj = APP_ZOOM_LEVELS.find(z => z.scale === scale) || APP_ZOOM_LEVELS[1];
+            const iconEl = document.getElementById('zoomToggleIcon');
+            const labelEl = document.getElementById('zoomToggleLabel');
+            if (iconEl) iconEl.innerText = zoomObj.icon;
+            if (labelEl) labelEl.innerText = zoomObj.label;
+        }
+
+        // Sayfa yüklendiğinde Tema ve Zoom UI etiketlerini ayarla
         document.addEventListener('DOMContentLoaded', () => {
             const current = localStorage.getItem('app_theme') || 'default';
             updateThemeUI(current);
+            const currentZoom = localStorage.getItem('app_zoom') || '1.08';
+            updateZoomUI(currentZoom);
         });
 
         function toggleFinansDropdown(e) {
@@ -700,7 +1282,11 @@
             }
             const fMenu = document.getElementById('finansMenu');
             if (fMenu) {
-                fMenu.classList.toggle('show');
+                const isShown = fMenu.classList.toggle('show');
+                if (!isShown) {
+                    const kMenu = document.getElementById('kasaSubMenu');
+                    if (kMenu) kMenu.classList.remove('show');
+                }
             }
             // Parametre menüsü açıksa kapat
             const pMenu = document.getElementById('paramMenu');
@@ -721,11 +1307,35 @@
             if (fMenu) fMenu.classList.remove('show');
         }
 
+        function toggleKasaSub(e) {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            const menu = document.getElementById('kasaSubMenu');
+            if (menu) {
+                menu.classList.toggle('show');
+            }
+        }
+
+        // Mouse menü dışına çıktığında veya dışarı tıklandığında menüyü kapat
+        document.addEventListener('DOMContentLoaded', () => {
+            const kDropdown = document.getElementById('kasaSubDropdown');
+            if (kDropdown) {
+                kDropdown.addEventListener('mouseleave', () => {
+                    const kMenu = document.getElementById('kasaSubMenu');
+                    if (kMenu) kMenu.classList.remove('show');
+                });
+            }
+        });
+
         window.addEventListener('click', function(e) {
             const fMenu = document.getElementById('finansMenu');
             if (fMenu && fMenu.classList.contains('show')) {
                 if (!e.target.closest('#finansDropdown')) {
                     fMenu.classList.remove('show');
+                    const kMenu = document.getElementById('kasaSubMenu');
+                    if (kMenu) kMenu.classList.remove('show');
                 }
             }
 
@@ -782,6 +1392,36 @@
                 lastActiveTime = Date.now();
             });
         })();
+
+        // ── NAVBAR CANLI DÖVİZ KURLARI ──
+        async function fetchNavRates(force = false) {
+            const btn = document.getElementById('navFxRefreshBtn');
+            if (btn) btn.classList.add('spinning');
+            try {
+                const res = await fetch('/api/doviz-kurlari' + (force ? '?force=1' : ''));
+                const data = await res.json();
+                if (data && data.rates) {
+                    const r = data.rates;
+                    const setVal = (id, val) => {
+                        const el = document.getElementById(id);
+                        if (el) el.textContent = val;
+                    };
+                    setVal('nav-usd-dzd', Number(r.USD_DZD).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                    setVal('nav-eur-dzd', Number(r.EUR_DZD).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                    setVal('nav-usd-try', Number(r.USD_TRY).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                    setVal('nav-eur-try', Number(r.EUR_TRY).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                    setVal('nav-dzd-try', Number(r.DZD_TRY).toLocaleString('tr-TR', { minimumFractionDigits: 3, maximumFractionDigits: 4 }));
+                }
+            } catch(e) {
+                console.warn('Navbar kurları alınamadı:', e);
+            } finally {
+                if (btn) setTimeout(() => btn.classList.remove('spinning'), 400);
+            }
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchNavRates();
+            setInterval(() => fetchNavRates(false), 60000);
+        });
     </script>
 </body>
 </html>
