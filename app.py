@@ -1414,6 +1414,26 @@ def bridge_nakit_unbilled():
 def bridge_nakit_debug():
     return sql_bridge.bridge_nakit_debug()
 
+@app.route('/bridge/kasa/kartlar', methods=['GET'])
+def app_bridge_kasa_kartlar():
+    return sql_bridge.bridge_kasa_kartlar()
+
+@app.route('/bridge/kasa/data-summary', methods=['GET', 'POST'])
+def app_bridge_kasa_data_summary():
+    return sql_bridge.bridge_kasa_data_summary()
+
+@app.route('/bridge/kasa/ozet-raporu', methods=['GET', 'POST'])
+def app_bridge_kasa_ozet_raporu():
+    return sql_bridge.bridge_kasa_ozet_raporu()
+
+@app.route('/bridge/kasa/analiz-ticari-grup', methods=['GET', 'POST'])
+def app_bridge_kasa_analiz_ticari_grup():
+    return sql_bridge.bridge_kasa_analiz_ticari_grup()
+
+@app.route('/bridge/kasa/analiz-drilldown', methods=['GET', 'POST'])
+def app_bridge_kasa_analiz_drilldown():
+    return sql_bridge.bridge_kasa_analiz_drilldown()
+
 @app.route('/api/bridge-status')
 def api_bridge_status():
     """Render tarafından bridge erişimini test eder."""

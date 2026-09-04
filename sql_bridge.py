@@ -13,16 +13,17 @@ import pandas as pd
 
 bridge_app = Flask(__name__)
 
-# --- GÜVENLİK: API anahtarı ortam değişkeninden alınır, kod içine yazılmaz ---
-BRIDGE_API_KEY = os.environ.get('BRIDGE_API_KEY', '')
+# --- GÜVENLİK: API anahtarı ortam değişkeninden alınır, varsayılan olarak tanımlı anahtar kullanılır ---
+BRIDGE_API_KEY = os.environ.get('BRIDGE_API_KEY') or 'nexlog_bridge_2026_secure_xKj9'
 
 # --- SQL BAĞLANTI (db_config.json'dan oku) ---
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'db_config.json')
 
-Firma = "226"
-Donem = "01"
+from db_manager import get_engine as db_manager_get_engine, get_active_firm_period
 
-from db_manager import get_engine as db_manager_get_engine
+_fp = get_active_firm_period(1)
+Firma = _fp.get('firm_nr', '225')
+Donem = _fp.get('period_nr', '01')
 
 def get_engine_by_id(conn_id=1):
     return db_manager_get_engine(conn_id)
@@ -634,6 +635,50 @@ def bridge_nakit_debug():
         return jsonify({'connection_error': str(e)}), 500
     
     return jsonify({'firma': Firma, 'donem': Donem, 'test_date': today, 'results': results})
+
+# ============================================================
+# KASA HAREKETLERİ & ANALİZİ KÖPRÜ ENDPOINTLERİ
+# ============================================================
+import kasa_hareketleri
+
+@bridge_app.route('/bridge/kasa/kartlar', methods=['GET'])
+def bridge_kasa_kartlar():
+    if not verify_key():
+        return jsonify({'error': 'Yetkisiz erişim'}), 401
+    return jsonify(kasa_hareketleri.get_kasa_kartlari(conn_id=1, force_local=True))
+
+@bridge_app.route('/bridge/kasa/data-summary', methods=['GET', 'POST'])
+def bridge_kasa_data_summary():
+    if not verify_key():
+        return jsonify({'error': 'Yetkisiz erişim'}), 401
+    filters = request.get_json() if request.method == 'POST' else request.args.to_dict()
+    limit = int(filters.get('limit', 2000)) if filters.get('limit') else 2000
+    res = kasa_hareketleri.get_kasa_data_and_summary(filters=filters, limit=limit, conn_id=1, force_local=True)
+    return jsonify(res)
+
+@bridge_app.route('/bridge/kasa/ozet-raporu', methods=['GET', 'POST'])
+def bridge_kasa_ozet_raporu():
+    if not verify_key():
+        return jsonify({'error': 'Yetkisiz erişim'}), 401
+    filters = request.get_json() if request.method == 'POST' else request.args.to_dict()
+    res = kasa_hareketleri.get_kasa_ozet_raporu(filters=filters, conn_id=1, force_local=True)
+    return jsonify(res)
+
+@bridge_app.route('/bridge/kasa/analiz-ticari-grup', methods=['GET', 'POST'])
+def bridge_kasa_analiz_ticari_grup():
+    if not verify_key():
+        return jsonify({'error': 'Yetkisiz erişim'}), 401
+    filters = request.get_json() if request.method == 'POST' else request.args.to_dict()
+    res = kasa_hareketleri.get_kasa_ticari_grup_analizi(filters=filters, conn_id=1, force_local=True)
+    return jsonify(res)
+
+@bridge_app.route('/bridge/kasa/analiz-drilldown', methods=['GET', 'POST'])
+def bridge_kasa_analiz_drilldown():
+    if not verify_key():
+        return jsonify({'error': 'Yetkisiz erişim'}), 401
+    filters = request.get_json() if request.method == 'POST' else request.args.to_dict()
+    res = kasa_hareketleri.get_kasa_analiz_drilldown(filters=filters, conn_id=1, force_local=True)
+    return jsonify(res)
 
 if __name__ == '__main__':
     print("SQL Köprü API çalışıyor: http://127.0.0.1:5001")

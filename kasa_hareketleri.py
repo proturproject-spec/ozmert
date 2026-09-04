@@ -2,14 +2,33 @@
 Kasa Hareketleri ve Raporu Modülü
 Logo Tiger LG_{firm}_{period}_KSLINES ve LG_{firm}_KSCARD tablolarından kasa hareketlerini listeler.
 """
+import os
 import io
+import requests as http_requests
 import pandas as pd
 from sqlalchemy import text
 import db_manager
 from db_manager import get_engine, get_active_firm_period, get_logo_currencies, get_active_currency
 
-def get_kasa_kartlari(conn_id=1):
+BRIDGE_URL = os.environ.get('BRIDGE_URL', '').rstrip('/')
+BRIDGE_KEY = os.environ.get('BRIDGE_API_KEY') or 'nexlog_bridge_2026_secure_xKj9'
+USE_BRIDGE = bool(BRIDGE_URL)
+
+def get_kasa_kartlari(conn_id=1, force_local=False):
     """Tanımlı aktif kasaları döner."""
+    if not force_local and USE_BRIDGE and BRIDGE_URL:
+        try:
+            resp = http_requests.get(
+                f"{BRIDGE_URL}/bridge/kasa/kartlar",
+                headers={'X-Bridge-Key': BRIDGE_KEY, 'ngrok-skip-browser-warning': 'true'},
+                timeout=15
+            )
+            if resp.status_code == 200:
+                return resp.json()
+        except Exception as e:
+            print(f"Bridge kasa kartlari hatası: {e}")
+            return []
+
     try:
         fp = get_active_firm_period(conn_id)
         firm = fp.get('firm_nr', '225')
@@ -298,8 +317,23 @@ def get_kasa_devir(filters=None, conn_id=1):
         print(f"Devir bakiye hesaplama hatası: {e}")
         return 0.0
 
-def get_kasa_data_and_summary(filters=None, limit=2000, conn_id=1):
+def get_kasa_data_and_summary(filters=None, limit=2000, conn_id=1, force_local=False):
     """Web arayüzü için veri listesi, devir ve kümülatif bakiye ile özet KPI toplamlarını döner."""
+    if not force_local and USE_BRIDGE and BRIDGE_URL:
+        try:
+            payload = dict(filters or {})
+            if limit: payload['limit'] = limit
+            resp = http_requests.post(
+                f"{BRIDGE_URL}/bridge/kasa/data-summary",
+                json=payload,
+                headers={'X-Bridge-Key': BRIDGE_KEY, 'ngrok-skip-browser-warning': 'true'},
+                timeout=30
+            )
+            if resp.status_code == 200:
+                return resp.json()
+        except Exception as e:
+            print(f"Bridge get_kasa_data_and_summary hatası: {e}")
+
     df = get_kasa_hareketleri_df(filters, limit=limit, conn_id=conn_id)
     devir = get_kasa_devir(filters, conn_id=conn_id)
 
@@ -427,11 +461,24 @@ def export_kasa_to_excel(filters=None, conn_id=1):
     output.seek(0)
     return output
 
-def get_kasa_ozet_raporu(filters=None, conn_id=1):
+def get_kasa_ozet_raporu(filters=None, conn_id=1, force_local=False):
     """
     Her kasanın KODU, KASA ADI, GİREN, ÇIKAN, BAKİYE ve PARA BİRİMİ özetini döner.
     filters: {'start_date': '...', 'end_date': '...', 'search': '...'}
     """
+    if not force_local and USE_BRIDGE and BRIDGE_URL:
+        try:
+            resp = http_requests.post(
+                f"{BRIDGE_URL}/bridge/kasa/ozet-raporu",
+                json=filters or {},
+                headers={'X-Bridge-Key': BRIDGE_KEY, 'ngrok-skip-browser-warning': 'true'},
+                timeout=30
+            )
+            if resp.status_code == 200:
+                return resp.json()
+        except Exception as e:
+            print(f"Bridge get_kasa_ozet_raporu hatası: {e}")
+
     filters = filters or {}
     fp = get_active_firm_period(conn_id)
     firm = fp.get('firm_nr', '225')
@@ -513,7 +560,7 @@ def export_kasa_raporu_to_excel(filters=None, conn_id=1):
     output.seek(0)
     return output
 
-def get_kasa_ticari_grup_analizi(filters=None, conn_id=1):
+def get_kasa_ticari_grup_analizi(filters=None, conn_id=1, force_local=False):
     """
     Ticari İşlem Grubu bazında 12 aylık Kasa Analiz pivot tablosunu döner.
     filters: dict {
@@ -523,6 +570,19 @@ def get_kasa_ticari_grup_analizi(filters=None, conn_id=1):
         'include_empty': bool (varsayılan True)
     }
     """
+    if not force_local and USE_BRIDGE and BRIDGE_URL:
+        try:
+            resp = http_requests.post(
+                f"{BRIDGE_URL}/bridge/kasa/analiz-ticari-grup",
+                json=filters or {},
+                headers={'X-Bridge-Key': BRIDGE_KEY, 'ngrok-skip-browser-warning': 'true'},
+                timeout=45
+            )
+            if resp.status_code == 200:
+                return resp.json()
+        except Exception as e:
+            print(f"Bridge get_kasa_ticari_grup_analizi hatası: {e}")
+
     filters = filters or {}
     fp = get_active_firm_period(conn_id)
     firm = fp.get('firm_nr', '225')
@@ -788,11 +848,24 @@ def export_kasa_analizi_to_excel(filters=None, conn_id=1):
     output.seek(0)
     return output
 
-def get_kasa_analiz_drilldown(filters=None, conn_id=1):
+def get_kasa_analiz_drilldown(filters=None, conn_id=1, force_local=False):
     """
     Kasa Analiz tablosunda tıklanan ay ve ticari işlem grubuna ait detay kasa hareket satırlarını (fişleri) getirir.
     all_groups=True ise o ayın TÜM gruplarına ait satırları getirir (aylık toplam hücresine tıklanınca).
     """
+    if not force_local and USE_BRIDGE and BRIDGE_URL:
+        try:
+            resp = http_requests.post(
+                f"{BRIDGE_URL}/bridge/kasa/analiz-drilldown",
+                json=filters or {},
+                headers={'X-Bridge-Key': BRIDGE_KEY, 'ngrok-skip-browser-warning': 'true'},
+                timeout=30
+            )
+            if resp.status_code == 200:
+                return resp.json()
+        except Exception as e:
+            print(f"Bridge get_kasa_analiz_drilldown hatası: {e}")
+
     if filters is None:
         filters = {}
 

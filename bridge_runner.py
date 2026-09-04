@@ -21,7 +21,10 @@ def main():
     # 1. sql_bridge.py başlat
     print("[1/3] SQL Köprü API servisi başlatılıyor (Port 5001)...")
     bridge_script = os.path.join(BASE_DIR, "sql_bridge.py")
-    bridge_proc = subprocess.Popen([PYTHON_EXE, bridge_script])
+    env = os.environ.copy()
+    if not env.get('BRIDGE_API_KEY'):
+        env['BRIDGE_API_KEY'] = 'nexlog_bridge_2026_secure_xKj9'
+    bridge_proc = subprocess.Popen([PYTHON_EXE, bridge_script], env=env)
     time.sleep(2)
 
     # 2. Cloudflare Tunnel başlat
