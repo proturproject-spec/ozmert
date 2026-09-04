@@ -19,7 +19,7 @@ BRIDGE_API_KEY = os.environ.get('BRIDGE_API_KEY') or 'nexlog_bridge_2026_secure_
 # --- SQL BAĞLANTI (db_config.json'dan oku) ---
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'db_config.json')
 
-from db_manager import get_engine as db_manager_get_engine, get_active_firm_period
+from db_manager import get_engine as db_manager_get_engine, get_active_firm_period, build_connection_uri
 
 _fp = get_active_firm_period(1)
 Firma = _fp.get('firm_nr', '225')
@@ -60,31 +60,14 @@ def test_connection():
     import time
     conn_data = request.get_json() or {}
     try:
-        driver = conn_data.get('driver', 'ODBC Driver 17 for SQL Server')
         server = conn_data.get('server', '').strip()
-        port = conn_data.get('port', '').strip()
         database = conn_data.get('database', '').strip()
-        username = conn_data.get('username', '').strip()
-        password = conn_data.get('password', '')
-        trusted_conn = conn_data.get('trusted_connection', False)
-        trust_cert = conn_data.get('trust_server_certificate', True)
         timeout = int(conn_data.get('timeout', 5))
 
         if not server or not database:
             return jsonify({'success': False, 'message': 'Sunucu veya veritabanı boş bırakılamaz.'}), 400
 
-        server_part = f"{server},{port}" if port and str(port).strip() != "1433" else server
-        parts = [f"DRIVER={{{driver}}}", f"SERVER={server_part}", f"DATABASE={database}"]
-        if trusted_conn:
-            parts.append("Trusted_Connection=yes")
-        else:
-            if username: parts.append(f"UID={username}")
-            if password: parts.append(f"PWD={password}")
-        if trust_cert:
-            parts.append("TrustServerCertificate=yes")
-        
-        encoded = urllib.parse.quote_plus(";".join(parts) + ";")
-        uri = f"mssql+pyodbc:///?odbc_connect={encoded}"
+        uri = build_connection_uri(conn_data)
         
         start_time = time.time()
         engine = create_engine(uri, connect_args={"timeout": timeout})
