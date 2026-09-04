@@ -1,6 +1,6 @@
 @echo off
 title Finans Muhasebe Paneli - Baslaniyor...
-cd /d "C:\Users\AliYokus\Desktop\github_project"
+cd /d "%~dp0"
 
 echo ============================================
 echo   Finans Muhasebe Paneli Baslatiliyor...
@@ -11,8 +11,14 @@ REM Ortam Değişkenlerini Tanımla (Kod içinde değil, ortamda tutulur)
 if "%SECRET_KEY%"=="" set SECRET_KEY=nexlog_finans_secret_key_2026_local
 if "%BRIDGE_API_KEY%"=="" set BRIDGE_API_KEY=nexlog_bridge_2026_secure_xKj9
 
+REM Python yolunu belirle (.venv öncelikli)
+set PYTHON_EXE=python
+if exist "%~dp0.venv\Scripts\python.exe" (
+    set PYTHON_EXE="%~dp0.venv\Scripts\python.exe"
+)
+
 REM Flask'i arka planda baslat
-start "" /B "C:\Users\AliYokus\AppData\Local\Programs\Python\Python314\python.exe" app.py
+start "" /B %PYTHON_EXE% app.py
 
 REM Flask'in hazir olmasini bekle
 echo Flask baslatiliyor, bekleyin...

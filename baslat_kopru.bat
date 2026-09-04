@@ -1,6 +1,6 @@
 @echo off
 title SQL Kopru + Ngrok Baslaniyor...
-cd /d "C:\Users\AliYokus\Desktop\github_project"
+cd /d "%~dp0"
 
 echo ============================================
 echo   SQL Kopru ve Ngrok Baslatiliyor...
@@ -10,9 +10,15 @@ echo.
 REM Ortam Değişkeni (Kod içinde değil, ortamda tutulur)
 if "%BRIDGE_API_KEY%"=="" set BRIDGE_API_KEY=nexlog_bridge_2026_secure_xKj9
 
+REM Python yolunu belirle (.venv öncelikli)
+set PYTHON_EXE=python
+if exist "%~dp0.venv\Scripts\python.exe" (
+    set PYTHON_EXE="%~dp0.venv\Scripts\python.exe"
+)
+
 REM sql_bridge.py'yi port 5001'de baslat
 echo [1/3] SQL Kopru baslatiliyor (port 5001)...
-start "" /B "C:\Users\AliYokus\AppData\Local\Programs\Python\Python314\python.exe" sql_bridge.py
+start "" /B %PYTHON_EXE% sql_bridge.py
 
 REM Koprunun hazir olmasini bekle
 timeout /t 4 /nobreak > nul
