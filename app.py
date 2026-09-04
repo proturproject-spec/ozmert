@@ -1298,21 +1298,46 @@ def test_connection_api():
             resp = http_requests.post(
                 f"{BRIDGE_URL}/bridge/test-connection",
                 json=conn_data,
-                headers={'X-Bridge-Key': BRIDGE_KEY},
-                timeout=15
+                headers={
+                    'X-Bridge-Key': BRIDGE_KEY,
+                    'ngrok-skip-browser-warning': 'true',
+                    'User-Agent': 'NexlogBridgeClient/1.0'
+                },
+                timeout=20
             )
-            return jsonify(resp.json())
+            if resp.status_code == 200:
+                try:
+                    return jsonify(resp.json())
+                except Exception:
+                    pass
+            
+            # 200 değilse veya JSON dönmediyse
+            status_code = resp.status_code
+            text_preview = resp.text[:120].replace('\n', ' ')
+            if status_code in (502, 503, 504) or "Cloudflare" in text_preview:
+                err_detail = "Cloudflare tüneli kapalı veya tünel adresi değişmiş."
+            elif status_code == 404:
+                err_detail = "Köprü adresi (URL) bulunamadı (404)."
+            elif status_code == 401:
+                err_detail = "Köprü API Anahtarı (BRIDGE_API_KEY) uyuşmuyor (401 Yetkisiz)."
+            else:
+                err_detail = f"Sunucu HTTP {status_code} yanıtı döndü."
+
+            return jsonify({
+                'success': False,
+                'message': f"Lokal SQL Köprüsüne ulaşılamadı ({err_detail}). Bilgisayarınızda 'baslat_kopru.bat' penceresinin AÇIK olduğundan ve Render.com Dashboard -> Environment sekmesindeki 'BRIDGE_URL' adresinin siyah penceredeki güncel tünel adresiyle birebir aynı olduğundan emin olun."
+            })
         except Exception as e:
             return jsonify({
                 'success': False,
-                'message': f"Lokal SQL Köprüsüne (Bridge) ulaşılamadı: {str(e)}. Bilgisayarınızda baslat.bat dosyasının açık olduğundan ve Render'daki BRIDGE_URL adresinin güncel olduğundan emin olun."
+                'message': f"Lokal SQL Köprüsüne bağlanırken ağ hatası oluştu: {str(e)}. Lütfen bilgisayarınızda baslat_kopru.bat'ın açık olduğunu ve Render'daki BRIDGE_URL adresinin güncel olduğunu kontrol edin."
             })
     
     # Eğer Render ortamındaysa ve BRIDGE_URL tanımlı DEĞİLSE
     if os.environ.get('RENDER') or os.environ.get('DYNO'):
         return jsonify({
             'success': False,
-            'message': "Canlı bulut sunucusunda (Render) yerel ağdaki 'UFUK-SERVER' SQL sunucusuna doğrudan erişilemez. Lütfen Render Dashboard -> Environment bölümünden 'BRIDGE_URL' ve 'BRIDGE_API_KEY' tanımlayın ve yerel bilgisayarınızda baslat.bat dosyasını çalıştırın."
+            'message': "Canlı bulut sunucusunda (Render) yerel ağdaki SQL sunucusuna doğrudan erişilemez. Lütfen Render Dashboard -> Environment bölümünden 'BRIDGE_URL' ve 'BRIDGE_API_KEY' tanımlayın ve yerel bilgisayarınızda baslat_kopru.bat dosyasını çalıştırın."
         })
 
     # Lokal ortamda doğrudan test et
@@ -1331,12 +1356,21 @@ def api_get_firms_periods():
             resp = http_requests.post(
                 f"{BRIDGE_URL}/bridge/firms-periods",
                 json=conn_data,
-                headers={'X-Bridge-Key': BRIDGE_KEY},
-                timeout=15
+                headers={
+                    'X-Bridge-Key': BRIDGE_KEY,
+                    'ngrok-skip-browser-warning': 'true',
+                    'User-Agent': 'NexlogBridgeClient/1.0'
+                },
+                timeout=20
             )
-            return jsonify(resp.json())
+            if resp.status_code == 200:
+                try:
+                    return jsonify(resp.json())
+                except Exception:
+                    pass
+            return jsonify({'success': False, 'message': f"Lokal SQL Köprüsüne ulaşılamadı (HTTP {resp.status_code})."})
         except Exception as e:
-            return jsonify({'success': False, 'message': f"Lokal SQL Köprüsüne (Bridge) ulaşılamadı: {str(e)}"})
+            return jsonify({'success': False, 'message': f"Lokal SQL Köprüsüne ulaşılamadı: {str(e)}"})
             
     return jsonify(fetch_firms_and_periods(conn_data))
 
