@@ -13,6 +13,7 @@ venv/
 *.sqlite
 *.sqlite3
 *.log
+*.exe
 
 # Geçici scriptler
 write_template.py
