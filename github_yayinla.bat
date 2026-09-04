@@ -8,35 +8,25 @@ echo        PROTUR YÖNETİM PANELİ - GITHUB YAYINLAMA
 echo ========================================================
 echo.
 
-echo [1/3] Değişiklikler taranıyor...
-git status -s
-echo.
-
-echo [2/3] Değişiklikler pakete ekleniyor (git add)...
+echo [1/2] Dosyalar pakete ekleniyor (requirements.txt, sayfalar, kodlar)...
 git add -A
+git commit -m "feat: Finans Paneli guncellemesi %date% %time%" >nul 2>&1
 
 echo.
-set /p commit_msg="Commit mesajı girin (Boş bırakmak için Enter'a basın): "
-if "%commit_msg%"=="" (
-    set commit_msg=Güncelleme: %date% %time%
-)
-
-git commit -m "%commit_msg%"
-
-echo.
-echo [3/3] GitHub'a gönderiliyor (git push origin main)...
+echo [2/2] GitHub'a gonderiliyor (git push)...
 echo.
 git push -u origin main --force
 
 echo.
 if %errorlevel% equ 0 (
     echo ========================================================
-    echo  [BAŞARILI] Değişiklikler GitHub'a başarıyla yüklendi!
+    echo  [BASARILI] Tum dosyalar GitHub'a yuklendi!
+    echo  Simdi Render.com sayfasina donup 'Deploy' yapabilirsiniz.
     echo ========================================================
 ) else (
     echo ========================================================
-    echo  [HATA] Gönderim tamamlanamadı. 
-    echo  Lütfen GitHub giriş penceresini kontrol ediniz.
+    echo  [HATA] Yukleme sirasinda hata olustu.
+    echo  Ekranda GitHub giris penceresi ciktiysa onaylayin.
     echo ========================================================
 )
 
