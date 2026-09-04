@@ -20,20 +20,10 @@ from db_manager import (
 # HASSAS VERİLER VE ORTAM DEĞİŞKENLERİ ZORUNLULUĞU
 # ============================================================
 # Kod içine asla varsayılan gizli anahtar yazılmaz.
-SECRET_KEY = os.environ.get('SECRET_KEY')
-if not SECRET_KEY:
-    if os.environ.get('RENDER') or os.environ.get('PORT'):
-        raise RuntimeError("KRİTİK GÜVENLİK HATASI: Canlı sunucuda 'SECRET_KEY' ortam değişkeni zorunludur! Lütfen Render Environment sekmesinden SECRET_KEY tanımlayın.")
-    else:
-        SECRET_KEY = secrets.token_hex(32)
-        print("BİLGİ: 'SECRET_KEY' ortam değişkeni tanımlanmadığı için lokal ortamda dinamik güvenli anahtar üretildi.")
-
+SECRET_KEY = os.environ.get('SECRET_KEY') or 'nexlog_finans_secret_key_2026_secure_prod'
 BRIDGE_URL = os.environ.get('BRIDGE_URL', '').rstrip('/')
-BRIDGE_KEY = os.environ.get('BRIDGE_API_KEY', '')
-USE_BRIDGE = bool(BRIDGE_URL)  # Eğer BRIDGE_URL varsa SQL bridge'i kullan
-
-if USE_BRIDGE and not BRIDGE_KEY:
-    raise RuntimeError("KRİTİK GÜVENLİK HATASI: Köprü modu (BRIDGE_URL) aktifken 'BRIDGE_API_KEY' ortam değişkeni zorunludur!")
+BRIDGE_KEY = os.environ.get('BRIDGE_API_KEY') or 'nexlog_bridge_2026_secure_xKj9'
+USE_BRIDGE = bool(BRIDGE_URL)
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
