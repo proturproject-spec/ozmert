@@ -26,7 +26,7 @@ git commit -m "%commit_msg%"
 echo.
 echo [3/3] GitHub'a gönderiliyor (git push origin main)...
 echo.
-git push origin main
+git push -u origin main
 
 echo.
 if %errorlevel% equ 0 (
