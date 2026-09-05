@@ -15,6 +15,7 @@ from db_manager import (
     fetch_firms_and_periods, get_active_firm_period,
     get_logo_currencies, load_general_settings, save_general_settings, get_active_currency
 )
+import auth_logger
 
 # ============================================================
 # HASSAS VERİLER VE ORTAM DEĞİŞKENLERİ ZORUNLULUĞU
@@ -279,10 +280,32 @@ def login():
                 'allowed_pages': user.get('allowed_pages', ['index', 'muhasebe', 'cari_ekstre', 'cari_kapama', 'tahsilat_takip', 'nakit_akis', 'finans', 'raporlar']) if user.get('role') != 'admin' else ['*']
             }
             session['last_active'] = time.time()
+            # Giriş Logunu Kaydet
+            auth_logger.log_login_event(
+                username=user.get('username'),
+                name=user.get('name', username),
+                role=user.get('role', 'user'),
+                ip=client_ip,
+                user_agent=request.headers.get('User-Agent', ''),
+                action='LOGIN',
+                status='SUCCESS',
+                details='Başarılı giriş yapıldı'
+            )
             next_url = request.args.get('next') or url_for('index')
             return redirect(next_url)
         else:
             record_failed_login(client_ip)
+            # Hatalı Giriş Logunu Kaydet
+            auth_logger.log_login_event(
+                username=username or 'Bilinmiyor',
+                name='-',
+                role='-',
+                ip=client_ip,
+                user_agent=request.headers.get('User-Agent', ''),
+                action='FAILED_LOGIN',
+                status='FAILED',
+                details='Hatalı şifre veya kullanıcı adı'
+            )
             rem = is_ip_rate_limited(client_ip)
             if rem > 0:
                 minutes = (rem // 60) + 1
@@ -296,8 +319,20 @@ def login():
 
 @app.route('/logout')
 def logout():
-    session.clear()
     timeout = request.args.get('timeout')
+    u = session.get('user') or {}
+    if u and u.get('username'):
+        auth_logger.log_login_event(
+            username=u.get('username'),
+            name=u.get('name', u.get('username')),
+            role=u.get('role', 'user'),
+            ip=get_client_ip(),
+            user_agent=request.headers.get('User-Agent', ''),
+            action='LOGOUT',
+            status='SUCCESS',
+            details='5 dk hareketsizlik zaman aşımı' if timeout else 'Güvenli oturum kapatıldı'
+        )
+    session.clear()
     if timeout:
         return redirect(url_for('login', timeout=1))
     return redirect(url_for('login'))
@@ -1251,6 +1286,40 @@ def api_clear_lockouts():
         return jsonify({'success': True, 'message': f'Acil durum anahtarı ile tüm kilitler sıfırlandı ({count} kayıt temizlendi).'})
 
     return jsonify({'success': False, 'message': 'Yetkisiz işlem.'}), 403
+
+# ============================================================
+# KULLANICI GİRİŞ & ERİŞİM GÜNLÜĞÜ (AUDIT LOG) ENDPOINTLERİ
+# ============================================================
+
+@app.route('/api/logs/login', methods=['GET'])
+@login_required
+def api_get_login_logs():
+    """Giriş, çıkış ve hatalı deneme loglarını döner (Admin yetkisi gerekir)."""
+    if 'user' not in session or session['user'].get('role') != 'admin':
+        return jsonify({'success': False, 'message': 'Bu işlem için yönetici yetkisi gereklidir.'}), 403
+    search = request.args.get('search', '')
+    action_filter = request.args.get('action', 'ALL')
+    limit = request.args.get('limit', 100)
+    try:
+        limit = int(limit)
+    except Exception:
+        limit = 100
+    logs = auth_logger.get_login_logs(limit=limit, search=search, action_filter=action_filter)
+    return jsonify({
+        'success': True,
+        'logs': logs,
+        'count': len(logs)
+    })
+
+@app.route('/api/logs/login/clear', methods=['POST'])
+@login_required
+def api_clear_login_logs():
+    """Tüm kullanıcı giriş loglarını temizler (Admin yetkisi gerekir)."""
+    if 'user' not in session or session['user'].get('role') != 'admin':
+        return jsonify({'success': False, 'message': 'Bu işlem için yönetici yetkisi gereklidir.'}), 403
+    if auth_logger.clear_login_logs():
+        return jsonify({'success': True, 'message': 'Tüm kullanıcı giriş kayıtları başarıyla temizlendi.'})
+    return jsonify({'success': False, 'message': 'Kayıtlar temizlenirken bir sorun oluştu.'}), 500
 
 def perform_sql_test(conn_data):
     try:

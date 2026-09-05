@@ -1030,6 +1030,66 @@
                     <div id="lockouts-list" style="margin-top: 0.85rem; display: none;"></div>
                 </div>
             </div>
+
+            <!-- KULLANICI GİRİŞ & ERİŞİM GÜNLÜĞÜ (AUDIT / LOGIN LOGS) -->
+            <div class="card" style="margin-top: 1.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
+                    <div>
+                        <h2 style="font-size: 1.2rem; margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.5rem; color: var(--text-main);">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                <polyline points="10 9 9 9 8 9"></polyline>
+                            </svg>
+                            Kullanıcı Giriş & Erişim Günlüğü (Loglar)
+                        </h2>
+                        <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">Sisteme kimlerin ne zaman, hangi IP ve cihazdan giriş yaptığını veya hatalı şifre denediğini gösterir.</p>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                        <select id="log-action-filter" class="form-control" style="width: auto; padding: 0.4rem 0.75rem; font-size: 0.82rem;" onchange="loadLoginLogs()">
+                            <option value="ALL">Tüm Hareketler</option>
+                            <option value="LOGIN">✅ Sadece Başarılı Girişler</option>
+                            <option value="FAILED_LOGIN">❌ Sadece Hatalı Denemeler</option>
+                            <option value="LOGOUT">🚪 Sadece Çıkışlar</option>
+                        </select>
+                        <input type="text" id="log-search-input" class="form-control" placeholder="Kullanıcı veya IP ara..." style="width: 175px; padding: 0.4rem 0.75rem; font-size: 0.82rem;" oninput="debounceLoadLoginLogs()">
+                        <button type="button" class="btn btn-outline" style="padding: 0.42rem 0.85rem; font-size: 0.82rem;" onclick="loadLoginLogs()" title="Günlükleri Yenile">
+                            🔄 Yenile
+                        </button>
+                        <button type="button" class="btn" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.42rem 0.85rem; font-size: 0.82rem; cursor: pointer;" onclick="handleClearLoginLogs()" title="Tüm Logları Temizle">
+                            🗑️ Temizle
+                        </button>
+                    </div>
+                </div>
+
+                <div style="overflow-x: auto; border: 1px solid var(--border-color); border-radius: 0.6rem; background: var(--card-bg-subtle);">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.84rem;">
+                        <thead>
+                            <tr style="background: rgba(255,255,255,0.02); border-bottom: 2px solid var(--border-color); color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em;">
+                                <th style="padding: 0.7rem 0.85rem;">Tarih / Saat</th>
+                                <th style="padding: 0.7rem 0.85rem;">Kullanıcı</th>
+                                <th style="padding: 0.7rem 0.85rem;">İşlem & Durum</th>
+                                <th style="padding: 0.7rem 0.85rem;">IP Adresi</th>
+                                <th style="padding: 0.7rem 0.85rem;">Cihaz & Tarayıcı</th>
+                                <th style="padding: 0.7rem 0.85rem;">Açıklama</th>
+                            </tr>
+                        </thead>
+                        <tbody id="login-logs-tbody">
+                            <tr>
+                                <td colspan="6" style="padding: 2.5rem; text-align: center; color: var(--text-muted);">
+                                    ⏳ Günlük kayıtları yükleniyor...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem; font-size: 0.78rem; color: var(--text-muted);">
+                    <span>📌 Son 100 giriş kaydı görüntülenir. (Sistemde son 1.000 hareket saklanır)</span>
+                    <span id="log-count-display" style="font-weight: 700; color: var(--text-main);">0 kayıt</span>
+                </div>
+            </div>
             {% endif %}
 
             <!-- KENDİ ŞİFRENİ DEĞİŞTİR KARTI -->
@@ -2035,9 +2095,119 @@
         }
     }
 
-    // Sayfa açıldığında kilitleri ve cari etiketlerini yükle
+    // ============================================================
+    // KULLANICI GİRİŞ GÜNLÜĞÜ (AUDIT / LOGIN LOGS)
+    // ============================================================
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    let logSearchTimeout = null;
+    function debounceLoadLoginLogs() {
+        clearTimeout(logSearchTimeout);
+        logSearchTimeout = setTimeout(() => {
+            loadLoginLogs();
+        }, 300);
+    }
+
+    async function loadLoginLogs() {
+        const tbody = document.getElementById('login-logs-tbody');
+        const countDisplay = document.getElementById('log-count-display');
+        if (!tbody) return;
+
+        const search = (document.getElementById('log-search-input')?.value || '').trim();
+        const actionFilter = document.getElementById('log-action-filter')?.value || 'ALL';
+
+        try {
+            const res = await fetch(`/api/logs/login?search=${encodeURIComponent(search)}&action=${encodeURIComponent(actionFilter)}&limit=100`);
+            const data = await res.json();
+            if (data.success) {
+                const logs = data.logs || [];
+                if (countDisplay) countDisplay.innerText = `${logs.length} kayıt`;
+                
+                if (logs.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="6" style="padding: 2.5rem; text-align: center; color: var(--text-muted);">
+                                📭 Kayıtlı giriş günlüğü bulunamadı.
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                tbody.innerHTML = logs.map(l => {
+                    let badge = '';
+                    if (l.action === 'LOGIN' && l.status === 'SUCCESS') {
+                        badge = '<span style="display: inline-flex; align-items: center; gap: 0.3rem; padding: 2px 8px; border-radius: 4px; font-size: 0.74rem; font-weight: 700; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);">✅ Başarılı Giriş</span>';
+                    } else if (l.action === 'FAILED_LOGIN' || l.status === 'FAILED') {
+                        badge = '<span style="display: inline-flex; align-items: center; gap: 0.3rem; padding: 2px 8px; border-radius: 4px; font-size: 0.74rem; font-weight: 700; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3);">❌ Hatalı Deneme</span>';
+                    } else if (l.action === 'LOGOUT') {
+                        badge = '<span style="display: inline-flex; align-items: center; gap: 0.3rem; padding: 2px 8px; border-radius: 4px; font-size: 0.74rem; font-weight: 700; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3);">🚪 Oturum Kapatıldı</span>';
+                    } else {
+                        badge = `<span style="padding: 2px 8px; border-radius: 4px; font-size: 0.74rem; font-weight: 700; background: var(--card-bg-subtle); color: var(--text-muted);">${escapeHtml(l.action)}</span>`;
+                    }
+
+                    return `
+                        <tr style="border-bottom: 1px solid var(--border-color);">
+                            <td style="padding: 0.65rem 0.85rem; font-family: 'Consolas', monospace; color: var(--text-muted); white-space: nowrap; font-size: 0.82rem;">
+                                ${escapeHtml(l.timestamp)}
+                            </td>
+                            <td style="padding: 0.65rem 0.85rem;">
+                                <div style="font-weight: 600; color: var(--text-main); font-size: 0.86rem;">${escapeHtml(l.name || l.username)}</div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted); font-family: 'Consolas', monospace;">@${escapeHtml(l.username)} ${l.role === 'admin' ? '<span style="color:#fbbf24;" title="Yönetici">⭐</span>' : ''}</div>
+                            </td>
+                            <td style="padding: 0.65rem 0.85rem; white-space: nowrap;">
+                                ${badge}
+                            </td>
+                            <td style="padding: 0.65rem 0.85rem; font-family: 'Consolas', monospace; color: #38bdf8; font-weight: 600; white-space: nowrap; font-size: 0.82rem;">
+                                ${escapeHtml(l.ip)}
+                            </td>
+                            <td style="padding: 0.65rem 0.85rem; white-space: nowrap;">
+                                <span style="font-weight: 500;">${escapeHtml(l.device)}</span>
+                                <span style="color: var(--text-muted); font-size: 0.78rem; margin-left: 0.35rem;">· ${escapeHtml(l.browser)}</span>
+                            </td>
+                            <td style="padding: 0.65rem 0.85rem; color: var(--text-muted); font-size: 0.8rem;">
+                                ${escapeHtml(l.details || '-')}
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        } catch (err) {
+            console.error('Giriş logları yüklenemedi:', err);
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="6" style="padding: 2rem; text-align: center; color: #f87171;">⚠️ Günlükler yüklenirken bir sorun oluştu.</td></tr>`;
+            }
+        }
+    }
+
+    async function handleClearLoginLogs() {
+        if (!confirm('Tüm kullanıcı giriş ve güvenlik kayıtlarını silmek istediğinize emin misiniz? Bu işlem geri alınamaz.')) return;
+        try {
+            const res = await fetch('/api/logs/login/clear', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+            const data = await res.json();
+            if (data.success) {
+                showToast(data.message || 'Loglar temizlendi.', 'success');
+                loadLoginLogs();
+            } else {
+                showToast(data.message || 'Loglar silinemedi.', 'error');
+            }
+        } catch (err) {
+            showToast('Loglar silinirken hata oluştu: ' + err.message, 'error');
+        }
+    }
+
+    // Sayfa açıldığında kilitleri, giriş loglarını ve cari etiketlerini yükle
     document.addEventListener('DOMContentLoaded', () => {
         loadActiveLockouts();
+        loadLoginLogs();
         renderPrefixTags();
     });
 
