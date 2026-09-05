@@ -490,34 +490,42 @@ def kasa_analizi_view():
 @app.route('/api/kasa-analizi/data', methods=['GET', 'POST'])
 @login_required
 def api_kasa_analizi_data():
-    if request.method == 'POST':
-        filters = request.get_json() or {}
-    else:
-        filters = {
-            'year': request.args.get('year'),
-            'kasa_kodu': request.args.get('kasa_kodu'),
-            'direction': request.args.get('direction', 'all'),
-            'include_empty': request.args.get('include_empty', 'true') in ['true', 'True', '1']
-        }
-    res = kasa_hareketleri.get_kasa_ticari_grup_analizi(filters)
-    return jsonify(res)
+    try:
+        if request.method == 'POST':
+            filters = request.get_json() or {}
+        else:
+            filters = {
+                'year': request.args.get('year'),
+                'kasa_kodu': request.args.get('kasa_kodu'),
+                'direction': request.args.get('direction', 'all'),
+                'include_empty': request.args.get('include_empty', 'true') in ['true', 'True', '1']
+            }
+        res = kasa_hareketleri.get_kasa_ticari_grup_analizi(filters)
+        return jsonify(res)
+    except Exception as e:
+        print(f"api_kasa_analizi_data error: {e}")
+        return jsonify({'success': False, 'message': str(e), 'categories': [], 'grand_total': 0, 'monthly_totals': {}}), 200
 
 @app.route('/api/kasa-analizi/drilldown', methods=['GET', 'POST'])
 @login_required
 def api_kasa_analizi_drilldown():
-    if request.method == 'POST':
-        filters = request.get_json() or {}
-    else:
-        filters = {
-            'trading_grp': request.args.get('trading_grp'),
-            'trading_code': request.args.get('trading_code'),
-            'year': request.args.get('year'),
-            'month': request.args.get('month'),
-            'kasa_kodu': request.args.get('kasa_kodu'),
-            'direction': request.args.get('direction', 'cikis')
-        }
-    res = kasa_hareketleri.get_kasa_analiz_drilldown(filters)
-    return jsonify(res)
+    try:
+        if request.method == 'POST':
+            filters = request.get_json() or {}
+        else:
+            filters = {
+                'trading_grp': request.args.get('trading_grp'),
+                'trading_code': request.args.get('trading_code'),
+                'year': request.args.get('year'),
+                'month': request.args.get('month'),
+                'kasa_kodu': request.args.get('kasa_kodu'),
+                'direction': request.args.get('direction', 'cikis')
+            }
+        res = kasa_hareketleri.get_kasa_analiz_drilldown(filters)
+        return jsonify(res)
+    except Exception as e:
+        print(f"api_kasa_analizi_drilldown error: {e}")
+        return jsonify({'success': False, 'message': str(e), 'lines': [], 'count': 0, 'total': 0.0}), 200
 
 @app.route('/api/kasa-analizi/export')
 @login_required
@@ -541,19 +549,23 @@ def api_kasa_analizi_export():
 @app.route('/api/kasa-hareketleri/data', methods=['GET', 'POST'])
 @login_required
 def api_kasa_hareketleri_data():
-    if request.method == 'POST':
-        filters = request.get_json() or {}
-    else:
-        filters = {
-            'start_date': request.args.get('start_date'),
-            'end_date': request.args.get('end_date'),
-            'kasa_kodu': request.args.get('kasa_kodu'),
-            'trcode': request.args.get('trcode'),
-            'search': request.args.get('search'),
-            'limit': request.args.get('limit', 2000)
-        }
-    res = kasa_hareketleri.get_kasa_data_and_summary(filters=filters)
-    return jsonify(res)
+    try:
+        if request.method == 'POST':
+            filters = request.get_json() or {}
+        else:
+            filters = {
+                'start_date': request.args.get('start_date'),
+                'end_date': request.args.get('end_date'),
+                'kasa_kodu': request.args.get('kasa_kodu'),
+                'trcode': request.args.get('trcode'),
+                'search': request.args.get('search'),
+                'limit': request.args.get('limit', 2000)
+            }
+        res = kasa_hareketleri.get_kasa_data_and_summary(filters=filters)
+        return jsonify(res)
+    except Exception as e:
+        print(f"api_kasa_hareketleri_data error: {e}")
+        return jsonify({'success': False, 'message': str(e), 'items': [], 'summary': {}}), 200
 
 @app.route('/api/kasa-hareketleri/export', methods=['GET'])
 @login_required
@@ -577,16 +589,20 @@ def api_kasa_hareketleri_export():
 @app.route('/api/kasa-raporu/data', methods=['GET', 'POST'])
 @login_required
 def api_kasa_raporu_data():
-    if request.method == 'POST':
-        filters = request.get_json() or {}
-    else:
-        filters = {
-            'start_date': request.args.get('start_date'),
-            'end_date': request.args.get('end_date'),
-            'search': request.args.get('search')
-        }
-    res = kasa_hareketleri.get_kasa_ozet_raporu(filters=filters)
-    return jsonify(res)
+    try:
+        if request.method == 'POST':
+            filters = request.get_json() or {}
+        else:
+            filters = {
+                'start_date': request.args.get('start_date'),
+                'end_date': request.args.get('end_date'),
+                'search': request.args.get('search')
+            }
+        res = kasa_hareketleri.get_kasa_ozet_raporu(filters=filters)
+        return jsonify(res)
+    except Exception as e:
+        print(f"api_kasa_raporu_data error: {e}")
+        return jsonify({'success': False, 'message': str(e), 'kasalar': [], 'summary': {}}), 200
 
 @app.route('/api/kasa-raporu/export', methods=['GET'])
 @login_required
@@ -1507,6 +1523,12 @@ def api_bridge_status():
             status['nakit_debug'] = f"BAĞLANAMADI: {str(e)}"
     
     return jsonify(status)
+
+@app.errorhandler(500)
+def handle_500_error(e):
+    if request.path.startswith('/api/') or request.path.startswith('/tahsilat/') or request.path.startswith('/cari/') or request.is_json:
+        return jsonify({'success': False, 'message': f'Sunucu hatası: {str(e)}'}), 500
+    return "Sunucu hatası oluştu (500)", 500
 
 if __name__ == '__main__':
     app.run(debug=True)

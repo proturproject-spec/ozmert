@@ -38,7 +38,7 @@ def main():
         print("[2/3] Cloudflare Güvenli Tüneli başlatılıyor (Üyelik/Token gerektirmez)...")
         tunnel_proc = subprocess.Popen(
             [cf_exe, "tunnel", "--url", "http://127.0.0.1:5001"],
-            stdout=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,
             text=True,
             bufsize=1
@@ -50,8 +50,19 @@ def main():
             if match:
                 tunnel_url = match.group(0)
                 break
-            if time.time() - start_t > 15:
+            if time.time() - start_t > 20:
                 break
+
+        # cloudflared'ın pipe buffer dolup kilitlenmesini (deadlock) önlemek için arka planda stderr'i tüket
+        import threading
+        def _drain_tunnel_pipe(pipe):
+            try:
+                for _ in pipe:
+                    pass
+            except Exception:
+                pass
+        drain_thread = threading.Thread(target=_drain_tunnel_pipe, args=(tunnel_proc.stderr,), daemon=True)
+        drain_thread.start()
     else:
         # Fallback to ngrok
         print("[2/3] Ngrok HTTP tüneli başlatılıyor (Port 5001)...")

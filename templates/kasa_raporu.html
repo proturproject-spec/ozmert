@@ -346,7 +346,14 @@
                 body: JSON.stringify(params)
             });
 
-            const data = await resp.json();
+            let data;
+            const contentType = resp.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+                data = await resp.json();
+            } else {
+                const text = await resp.text();
+                throw new Error(resp.ok ? 'Geçersiz veri formatı alındı.' : `Sunucu hatası (HTTP ${resp.status}). Lokal SQL köprüsü açık mı?`);
+            }
 
             if (data.success) {
                 const summary = data.summary;
@@ -437,16 +444,20 @@
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="6" style="padding: 2rem; text-align: center; color: #f87171;">
-                            ⚠️ Hata: ${data.message || 'Bakiyeler alınırken bir sorun oluştu.'}
+                            ⚠️ Hata: ${escapeHtml(data.message || 'Bakiyeler alınırken bir sorun oluştu.')}
                         </td>
                     </tr>
                 `;
             }
         } catch (e) {
+            let errMsg = e.message || 'Bağlantı hatası oluştu.';
+            if (errMsg.includes('Unexpected token') || errMsg.includes('JSON')) {
+                errMsg = "Lokal SQL Köprüsüne bağlanılamadı. Lütfen sunucu/bilgisayarınızda baslat_kopru.bat'ın çalıştığından emin olun.";
+            }
             tbody.innerHTML = `
                 <tr>
                     <td colspan="6" style="padding: 2rem; text-align: center; color: #f87171;">
-                        ⚠️ Bağlantı hatası: ${e.message}
+                        ⚠️ ${escapeHtml(errMsg)}
                     </td>
                 </tr>
             `;

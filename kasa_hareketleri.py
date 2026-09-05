@@ -10,23 +10,38 @@ from sqlalchemy import text
 import db_manager
 from db_manager import get_engine, get_active_firm_period, get_logo_currencies, get_active_currency
 
+def get_bridge_config():
+    """Çalışma anında ortam değişkenlerini dinamik okur."""
+    bridge_url = os.environ.get('BRIDGE_URL', '').rstrip('/')
+    bridge_key = os.environ.get('BRIDGE_API_KEY') or 'nexlog_bridge_2026_secure_xKj9'
+    is_render = bool(os.environ.get('RENDER') or os.environ.get('DYNO'))
+    use_bridge = bool(bridge_url)
+    return bridge_url, bridge_key, is_render, use_bridge
+
 BRIDGE_URL = os.environ.get('BRIDGE_URL', '').rstrip('/')
 BRIDGE_KEY = os.environ.get('BRIDGE_API_KEY') or 'nexlog_bridge_2026_secure_xKj9'
 USE_BRIDGE = bool(BRIDGE_URL)
 
 def get_kasa_kartlari(conn_id=1, force_local=False):
     """Tanımlı aktif kasaları döner."""
-    if not force_local and USE_BRIDGE and BRIDGE_URL:
+    bridge_url, bridge_key, is_render, use_bridge = get_bridge_config()
+    if not force_local and (use_bridge or is_render):
+        if not bridge_url:
+            return []
         try:
             resp = http_requests.get(
-                f"{BRIDGE_URL}/bridge/kasa/kartlar",
-                headers={'X-Bridge-Key': BRIDGE_KEY, 'ngrok-skip-browser-warning': 'true'},
+                f"{bridge_url}/bridge/kasa/kartlar",
+                headers={'X-Bridge-Key': bridge_key, 'ngrok-skip-browser-warning': 'true', 'User-Agent': 'NexlogBridgeClient/1.0'},
                 timeout=15
             )
             if resp.status_code == 200:
-                return resp.json()
+                try:
+                    return resp.json()
+                except Exception:
+                    pass
         except Exception as e:
             print(f"Bridge kasa kartlari hatası: {e}")
+        if is_render:
             return []
 
     try:
@@ -319,74 +334,123 @@ def get_kasa_devir(filters=None, conn_id=1):
 
 def get_kasa_data_and_summary(filters=None, limit=2000, conn_id=1, force_local=False):
     """Web arayüzü için veri listesi, devir ve kümülatif bakiye ile özet KPI toplamlarını döner."""
-    if not force_local and USE_BRIDGE and BRIDGE_URL:
+    bridge_url, bridge_key, is_render, use_bridge = get_bridge_config()
+    if not force_local and (use_bridge or is_render):
+        if not bridge_url:
+            return {
+                'success': False,
+                'message': "Canlı bulut sunucusunda (Render) BRIDGE_URL tanımlı değil. Lütfen Render Dashboard -> Environment sekmesinden BRIDGE_URL değerini girin ve yerel bilgisayarınızda baslat_kopru.bat dosyasını çalıştırın.",
+                'records': [],
+                'count': 0,
+                'summary': {'total_giris': 0, 'total_cikis': 0, 'net_bakiye': 0, 'devir': 0, 'son_bakiye': 0, 'count': 0, 'currency': 'DZD'},
+                'kpi': {'toplam_giris': 0, 'toplam_cikis': 0, 'net_bakiye': 0, 'kayit_sayisi': 0, 'devir_bakiye': 0, 'son_bakiye': 0}
+            }
         try:
             payload = dict(filters or {})
             if limit: payload['limit'] = limit
             resp = http_requests.post(
-                f"{BRIDGE_URL}/bridge/kasa/data-summary",
+                f"{bridge_url}/bridge/kasa/data-summary",
                 json=payload,
-                headers={'X-Bridge-Key': BRIDGE_KEY, 'ngrok-skip-browser-warning': 'true'},
+                headers={'X-Bridge-Key': bridge_key, 'ngrok-skip-browser-warning': 'true', 'User-Agent': 'NexlogBridgeClient/1.0'},
                 timeout=30
             )
             if resp.status_code == 200:
-                return resp.json()
+                try:
+                    return resp.json()
+                except Exception:
+                    pass
+            err_msg = f"Lokal SQL Köprüsünden veri alınamadı (HTTP {resp.status_code}). Bilgisayarınızda baslat_kopru.bat açık mı? Render BRIDGE_URL güncel mi?"
+            return {
+                'success': False,
+                'message': err_msg,
+                'records': [],
+                'count': 0,
+                'summary': {'total_giris': 0, 'total_cikis': 0, 'net_bakiye': 0, 'devir': 0, 'son_bakiye': 0, 'count': 0, 'currency': 'DZD'},
+                'kpi': {'toplam_giris': 0, 'toplam_cikis': 0, 'net_bakiye': 0, 'kayit_sayisi': 0, 'devir_bakiye': 0, 'son_bakiye': 0}
+            }
         except Exception as e:
-            print(f"Bridge get_kasa_data_and_summary hatası: {e}")
+            err_msg = f"Lokal SQL Köprüsüne bağlanılamadı ({str(e)}). Bilgisayarınızda baslat_kopru.bat açık mı?"
+            return {
+                'success': False,
+                'message': err_msg,
+                'records': [],
+                'count': 0,
+                'summary': {'total_giris': 0, 'total_cikis': 0, 'net_bakiye': 0, 'devir': 0, 'son_bakiye': 0, 'count': 0, 'currency': 'DZD'},
+                'kpi': {'toplam_giris': 0, 'toplam_cikis': 0, 'net_bakiye': 0, 'kayit_sayisi': 0, 'devir_bakiye': 0, 'son_bakiye': 0}
+            }
 
-    df = get_kasa_hareketleri_df(filters, limit=limit, conn_id=conn_id)
-    devir = get_kasa_devir(filters, conn_id=conn_id)
+    try:
+        df = get_kasa_hareketleri_df(filters, limit=limit, conn_id=conn_id)
+        devir = get_kasa_devir(filters, conn_id=conn_id)
 
-    total_giris = float(df['Giriş (Borç)'].sum()) if not df.empty else 0.0
-    total_cikis = float(df['Çıkış (Alacak)'].sum()) if not df.empty else 0.0
-    net_bakiye = total_giris - total_cikis
-    record_count = len(df)
+        total_giris = float(df['Giriş (Borç)'].sum()) if not df.empty else 0.0
+        total_cikis = float(df['Çıkış (Alacak)'].sum()) if not df.empty else 0.0
+        net_bakiye = total_giris - total_cikis
+        record_count = len(df)
 
-    # Tarihi string formata çevir (GG.AA.YYYY - 00.00.0000)
-    def format_date_tr(d):
-        if pd.isna(d) or d is None:
-            return ''
-        if hasattr(d, 'strftime'):
-            return d.strftime('%d.%m.%Y')
-        s = str(d).strip()
-        if len(s) >= 10 and s[4] == '-' and s[7] == '-':
-            return f"{s[8:10]}.{s[5:7]}.{s[0:4]}"
-        return s
+        # Tarihi string formata çevir (GG.AA.YYYY - 00.00.0000)
+        def format_date_tr(d):
+            if pd.isna(d) or d is None:
+                return ''
+            if hasattr(d, 'strftime'):
+                return d.strftime('%d.%m.%Y')
+            s = str(d).strip()
+            if len(s) >= 10 and s[4] == '-' and s[7] == '-':
+                return f"{s[8:10]}.{s[5:7]}.{s[0:4]}"
+            return s
 
-    if not df.empty and 'Tarih' in df.columns:
-        df['Tarih_Str'] = df['Tarih'].apply(format_date_tr)
-    else:
-        df['Tarih_Str'] = ''
+        if not df.empty and 'Tarih' in df.columns:
+            df['Tarih_Str'] = df['Tarih'].apply(format_date_tr)
+        else:
+            df['Tarih_Str'] = ''
 
-    records = df.to_dict(orient='records')
-    
-    # Devir ile başlayarak her satır için kümülatif BAKİYE hesapla
-    running_bakiye = devir
-    for r in records:
-        if 'Tarih' in r:
-            r['Tarih'] = format_date_tr(r['Tarih'])
-        giris = float(r.get('Giriş (Borç)', 0) or 0)
-        cikis = float(r.get('Çıkış (Alacak)', 0) or 0)
-        running_bakiye += (giris - cikis)
-        r['Bakiye'] = running_bakiye
+        records = df.to_dict(orient='records')
+        
+        # Devir ile başlayarak her satır için kümülatif BAKİYE hesapla
+        running_bakiye = devir
+        for r in records:
+            if 'Tarih' in r:
+                r['Tarih'] = format_date_tr(r['Tarih'])
+            giris = float(r.get('Giriş (Borç)', 0) or 0)
+            cikis = float(r.get('Çıkış (Alacak)', 0) or 0)
+            running_bakiye += (giris - cikis)
+            r['Bakiye'] = running_bakiye
 
-    active_curr = get_active_currency(conn_id)
+        active_curr = get_active_currency(conn_id)
 
-    return {
-        'success': True,
-        'records': records,
-        'count': record_count,
-        'devir': devir,
-        'summary': {
-            'total_giris': total_giris,
-            'total_cikis': total_cikis,
-            'net_bakiye': net_bakiye,
-            'devir': devir,
-            'son_bakiye': running_bakiye,
+        return {
+            'success': True,
+            'records': records,
             'count': record_count,
-            'currency': active_curr
+            'devir': devir,
+            'summary': {
+                'total_giris': total_giris,
+                'total_cikis': total_cikis,
+                'net_bakiye': net_bakiye,
+                'devir': devir,
+                'son_bakiye': running_bakiye,
+                'count': record_count,
+                'currency': active_curr
+            },
+            'kpi': {
+                'toplam_giris': total_giris,
+                'toplam_cikis': total_cikis,
+                'net_bakiye': net_bakiye,
+                'kayit_sayisi': record_count,
+                'devir_bakiye': devir,
+                'son_bakiye': running_bakiye,
+                'currency': active_curr
+            }
         }
-    }
+    except Exception as e:
+        return {
+            'success': False,
+            'message': f"Veritabanı hatası: {str(e)}",
+            'records': [],
+            'count': 0,
+            'summary': {'total_giris': 0, 'total_cikis': 0, 'net_bakiye': 0, 'devir': 0, 'son_bakiye': 0, 'count': 0, 'currency': 'DZD'},
+            'kpi': {'toplam_giris': 0, 'toplam_cikis': 0, 'net_bakiye': 0, 'kayit_sayisi': 0, 'devir_bakiye': 0, 'son_bakiye': 0}
+        }
 
 def export_kasa_to_excel(filters=None, conn_id=1):
     """Filtrelenmiş kasa hareketlerini kullanıcının istediği 11 sütun ve DEVİR formatında Excel olarak üretir."""
@@ -466,88 +530,123 @@ def get_kasa_ozet_raporu(filters=None, conn_id=1, force_local=False):
     Her kasanın KODU, KASA ADI, GİREN, ÇIKAN, BAKİYE ve PARA BİRİMİ özetini döner.
     filters: {'start_date': '...', 'end_date': '...', 'search': '...'}
     """
-    if not force_local and USE_BRIDGE and BRIDGE_URL:
+    bridge_url, bridge_key, is_render, use_bridge = get_bridge_config()
+    if not force_local and (use_bridge or is_render):
+        if not bridge_url:
+            return {
+                'success': False,
+                'message': "Canlı bulut sunucusunda (Render) BRIDGE_URL tanımlı değil. Lütfen Render Dashboard -> Environment sekmesinden BRIDGE_URL değerini girin ve yerel bilgisayarınızda baslat_kopru.bat dosyasını çalıştırın.",
+                'records': [],
+                'count': 0,
+                'summary': {'total_giren': 0, 'total_cikan': 0, 'total_bakiye': 0, 'negative_count': 0, 'kasa_count': 0, 'currency': 'DZD'}
+            }
         try:
             resp = http_requests.post(
-                f"{BRIDGE_URL}/bridge/kasa/ozet-raporu",
+                f"{bridge_url}/bridge/kasa/ozet-raporu",
                 json=filters or {},
-                headers={'X-Bridge-Key': BRIDGE_KEY, 'ngrok-skip-browser-warning': 'true'},
+                headers={'X-Bridge-Key': bridge_key, 'ngrok-skip-browser-warning': 'true', 'User-Agent': 'NexlogBridgeClient/1.0'},
                 timeout=30
             )
             if resp.status_code == 200:
-                return resp.json()
+                try:
+                    return resp.json()
+                except Exception:
+                    pass
+            err_msg = f"Lokal SQL Köprüsünden veri alınamadı (HTTP {resp.status_code}). Bilgisayarınızda baslat_kopru.bat açık mı? Render'daki BRIDGE_URL güncel mi?"
+            return {
+                'success': False,
+                'message': err_msg,
+                'records': [],
+                'count': 0,
+                'summary': {'total_giren': 0, 'total_cikan': 0, 'total_bakiye': 0, 'negative_count': 0, 'kasa_count': 0, 'currency': 'DZD'}
+            }
         except Exception as e:
-            print(f"Bridge get_kasa_ozet_raporu hatası: {e}")
+            return {
+                'success': False,
+                'message': f"Lokal SQL Köprüsüne bağlanılamadı ({str(e)}). Bilgisayarınızda baslat_kopru.bat penceresinin açık ve Render'daki BRIDGE_URL adresinin doğru olduğundan emin olun.",
+                'records': [],
+                'count': 0,
+                'summary': {'total_giren': 0, 'total_cikan': 0, 'total_bakiye': 0, 'negative_count': 0, 'kasa_count': 0, 'currency': 'DZD'}
+            }
 
-    filters = filters or {}
-    fp = get_active_firm_period(conn_id)
-    firm = fp.get('firm_nr', '225')
-    period = fp.get('period_nr', '01')
-    engine = get_engine(conn_id)
-    active_curr = get_active_currency(conn_id)
+    try:
+        filters = filters or {}
+        fp = get_active_firm_period(conn_id)
+        firm = fp.get('firm_nr', '225')
+        period = fp.get('period_nr', '01')
+        engine = get_engine(conn_id)
+        active_curr = get_active_currency(conn_id)
 
-    where_kslines = ["KSL.CANCELLED = 0"]
-    params = {}
+        where_kslines = ["KSL.CANCELLED = 0"]
+        params = {}
 
-    start_date = filters.get('start_date')
-    if start_date:
-        where_kslines.append("CAST(KSL.DATE_ AS DATE) >= :start_date")
-        params['start_date'] = start_date
+        start_date = filters.get('start_date')
+        if start_date:
+            where_kslines.append("CAST(KSL.DATE_ AS DATE) >= :start_date")
+            params['start_date'] = start_date
 
-    end_date = filters.get('end_date')
-    if end_date:
-        where_kslines.append("CAST(KSL.DATE_ AS DATE) <= :end_date")
-        params['end_date'] = end_date
+        end_date = filters.get('end_date')
+        if end_date:
+            where_kslines.append("CAST(KSL.DATE_ AS DATE) <= :end_date")
+            params['end_date'] = end_date
 
-    kslines_where = " AND ".join(where_kslines)
+        kslines_where = " AND ".join(where_kslines)
 
-    where_ks = ["KS.ACTIVE = 0"]
-    search = str(filters.get('search') or '').strip()
-    if search:
-        search_like = f"%{search}%"
-        where_ks.append("(KS.CODE LIKE :search OR KS.NAME LIKE :search)")
-        params['search'] = search_like
+        where_ks = ["KS.ACTIVE = 0"]
+        search = str(filters.get('search') or '').strip()
+        if search:
+            search_like = f"%{search}%"
+            where_ks.append("(KS.CODE LIKE :search OR KS.NAME LIKE :search)")
+            params['search'] = search_like
 
-    ks_where = " AND ".join(where_ks)
+        ks_where = " AND ".join(where_ks)
 
-    sql_query = f"""
-    SELECT 
-        KS.CODE AS [KODU],
-        KS.NAME AS [KASA ADI],
-        ISNULL(SUM(CASE WHEN KSL.SIGN = 0 THEN KSL.AMOUNT ELSE 0 END), 0) AS [GİREN],
-        ISNULL(SUM(CASE WHEN KSL.SIGN = 1 THEN KSL.AMOUNT ELSE 0 END), 0) AS [ÇIKAN],
-        ISNULL(SUM(CASE WHEN KSL.SIGN = 0 THEN KSL.AMOUNT ELSE -KSL.AMOUNT END), 0) AS [BAKİYE],
-        '{active_curr}' AS [PARA BİRİMİ]
-    FROM LG_{firm}_KSCARD KS WITH(NOLOCK)
-    LEFT JOIN LG_{firm}_{period}_KSLINES KSL WITH(NOLOCK) 
-        ON KSL.CARDREF = KS.LOGICALREF AND {kslines_where}
-    WHERE {ks_where}
-    GROUP BY KS.CODE, KS.NAME
-    ORDER BY KS.CODE
-    """
+        sql_query = f"""
+        SELECT 
+            KS.CODE AS [KODU],
+            KS.NAME AS [KASA ADI],
+            ISNULL(SUM(CASE WHEN KSL.SIGN = 0 THEN KSL.AMOUNT ELSE 0 END), 0) AS [GİREN],
+            ISNULL(SUM(CASE WHEN KSL.SIGN = 1 THEN KSL.AMOUNT ELSE 0 END), 0) AS [ÇIKAN],
+            ISNULL(SUM(CASE WHEN KSL.SIGN = 0 THEN KSL.AMOUNT ELSE -KSL.AMOUNT END), 0) AS [BAKİYE],
+            '{active_curr}' AS [PARA BİRİMİ]
+        FROM LG_{firm}_KSCARD KS WITH(NOLOCK)
+        LEFT JOIN LG_{firm}_{period}_KSLINES KSL WITH(NOLOCK) 
+            ON KSL.CARDREF = KS.LOGICALREF AND {kslines_where}
+        WHERE {ks_where}
+        GROUP BY KS.CODE, KS.NAME
+        ORDER BY KS.CODE
+        """
 
-    with engine.connect() as conn:
-        df = pd.read_sql(text(sql_query), conn, params=params)
+        with engine.connect() as conn:
+            df = pd.read_sql(text(sql_query), conn, params=params)
 
-    total_giren = float(df['GİREN'].sum()) if not df.empty else 0.0
-    total_cikan = float(df['ÇIKAN'].sum()) if not df.empty else 0.0
-    total_bakiye = float(df['BAKİYE'].sum()) if not df.empty else 0.0
-    negative_count = int((df['BAKİYE'] < 0).sum()) if not df.empty else 0
+        total_giren = float(df['GİREN'].sum()) if not df.empty else 0.0
+        total_cikan = float(df['ÇIKAN'].sum()) if not df.empty else 0.0
+        total_bakiye = float(df['BAKİYE'].sum()) if not df.empty else 0.0
+        negative_count = int((df['BAKİYE'] < 0).sum()) if not df.empty else 0
 
-    records = df.to_dict(orient='records')
-    return {
-        'success': True,
-        'records': records,
-        'count': len(records),
-        'summary': {
-            'total_giren': total_giren,
-            'total_cikan': total_cikan,
-            'total_bakiye': total_bakiye,
-            'negative_count': negative_count,
-            'kasa_count': len(records),
-            'currency': active_curr
+        records = df.to_dict(orient='records')
+        return {
+            'success': True,
+            'records': records,
+            'count': len(records),
+            'summary': {
+                'total_giren': total_giren,
+                'total_cikan': total_cikan,
+                'total_bakiye': total_bakiye,
+                'negative_count': negative_count,
+                'kasa_count': len(records),
+                'currency': active_curr
+            }
         }
-    }
+    except Exception as e:
+        return {
+            'success': False,
+            'message': f"Veritabanı sorgu hatası: {str(e)}",
+            'records': [],
+            'count': 0,
+            'summary': {'total_giren': 0, 'total_cikan': 0, 'total_bakiye': 0, 'negative_count': 0, 'kasa_count': 0, 'currency': 'DZD'}
+        }
 
 def export_kasa_raporu_to_excel(filters=None, conn_id=1):
     """Kasa bakiye raporunu Excel (.xlsx) dosyası olarak üretir."""
@@ -570,141 +669,193 @@ def get_kasa_ticari_grup_analizi(filters=None, conn_id=1, force_local=False):
         'include_empty': bool (varsayılan True)
     }
     """
-    if not force_local and USE_BRIDGE and BRIDGE_URL:
+    bridge_url, bridge_key, is_render, use_bridge = get_bridge_config()
+    if not force_local and (use_bridge or is_render):
+        if not bridge_url:
+            return {
+                'success': False,
+                'message': "Canlı bulut sunucusunda (Render) BRIDGE_URL tanımlı değil. Lütfen Render Dashboard -> Environment sekmesinden BRIDGE_URL değerini girin ve yerel bilgisayarınızda baslat_kopru.bat dosyasını çalıştırın.",
+                'records': [],
+                'categories': [],
+                'monthly_totals': {},
+                'grand_total': 0.0,
+                'count': 0,
+                'currency': 'DZD',
+                'year': 2026
+            }
         try:
             resp = http_requests.post(
-                f"{BRIDGE_URL}/bridge/kasa/analiz-ticari-grup",
+                f"{bridge_url}/bridge/kasa/analiz-ticari-grup",
                 json=filters or {},
-                headers={'X-Bridge-Key': BRIDGE_KEY, 'ngrok-skip-browser-warning': 'true'},
+                headers={'X-Bridge-Key': bridge_key, 'ngrok-skip-browser-warning': 'true', 'User-Agent': 'NexlogBridgeClient/1.0'},
                 timeout=45
             )
             if resp.status_code == 200:
-                return resp.json()
-        except Exception as e:
-            print(f"Bridge get_kasa_ticari_grup_analizi hatası: {e}")
-
-    filters = filters or {}
-    fp = get_active_firm_period(conn_id)
-    firm = fp.get('firm_nr', '225')
-    period = fp.get('period_nr', '01')
-    engine = get_engine(conn_id)
-    active_curr = get_active_currency(conn_id) or 'DZD'
-
-    year = filters.get('year')
-    try:
-        year = int(year) if year else 2026
-    except (ValueError, TypeError):
-        year = 2026
-
-    kasa_kodu = filters.get('kasa_kodu')
-    direction = (filters.get('direction') or 'all').lower()
-    include_empty = filters.get('include_empty', True)
-    if isinstance(include_empty, str):
-        include_empty = include_empty.lower() in ['true', '1', 'yes']
-
-    where_clauses = ["YEAR(KSL.DATE_) = :year"]
-    params = {'year': year}
-
-    if kasa_kodu and kasa_kodu != 'ALL' and str(kasa_kodu).strip():
-        where_clauses.append("KS.CODE = :kasa_kodu")
-        params['kasa_kodu'] = str(kasa_kodu).strip()
-
-    if direction == 'cikis':
-        where_clauses.append("KSL.SIGN = 1")
-    elif direction == 'giris':
-        where_clauses.append("KSL.SIGN = 0")
-
-    if not include_empty:
-        where_clauses.append("ISNULL(LTRIM(RTRIM(KSL.TRADINGGRP)), '') <> ''")
-
-    where_sql = " AND ".join(where_clauses)
-
-    sql_query = f"""
-    SELECT 
-        COALESCE(NULLIF(LTRIM(RTRIM(TRG.GDEF)), ''), NULLIF(LTRIM(RTRIM(KSL.TRADINGGRP)), ''), '(Grup Belirtilmemiş)') AS [TICARI_ISLEM_GRUBU],
-        ISNULL(NULLIF(LTRIM(RTRIM(KSL.TRADINGGRP)), ''), '-') AS [GRUP_KODU],
-        ISNULL(SUM(CASE WHEN MONTH(KSL.DATE_) = 1 THEN KSL.AMOUNT ELSE 0 END), 0) AS [OCAK],
-        ISNULL(SUM(CASE WHEN MONTH(KSL.DATE_) = 2 THEN KSL.AMOUNT ELSE 0 END), 0) AS [SUBAT],
-        ISNULL(SUM(CASE WHEN MONTH(KSL.DATE_) = 3 THEN KSL.AMOUNT ELSE 0 END), 0) AS [MART],
-        ISNULL(SUM(CASE WHEN MONTH(KSL.DATE_) = 4 THEN KSL.AMOUNT ELSE 0 END), 0) AS [NISAN],
-        ISNULL(SUM(CASE WHEN MONTH(KSL.DATE_) = 5 THEN KSL.AMOUNT ELSE 0 END), 0) AS [MAYIS],
-        ISNULL(SUM(CASE WHEN MONTH(KSL.DATE_) = 6 THEN KSL.AMOUNT ELSE 0 END), 0) AS [HAZIRAN],
-        ISNULL(SUM(CASE WHEN MONTH(KSL.DATE_) = 7 THEN KSL.AMOUNT ELSE 0 END), 0) AS [TEMMUZ],
-        ISNULL(SUM(CASE WHEN MONTH(KSL.DATE_) = 8 THEN KSL.AMOUNT ELSE 0 END), 0) AS [AGUSTOS],
-        ISNULL(SUM(CASE WHEN MONTH(KSL.DATE_) = 9 THEN KSL.AMOUNT ELSE 0 END), 0) AS [EYLUL],
-        ISNULL(SUM(CASE WHEN MONTH(KSL.DATE_) = 10 THEN KSL.AMOUNT ELSE 0 END), 0) AS [EKIM],
-        ISNULL(SUM(CASE WHEN MONTH(KSL.DATE_) = 11 THEN KSL.AMOUNT ELSE 0 END), 0) AS [KASIM],
-        ISNULL(SUM(CASE WHEN MONTH(KSL.DATE_) = 12 THEN KSL.AMOUNT ELSE 0 END), 0) AS [ARALIK],
-        ISNULL(SUM(KSL.AMOUNT), 0) AS [TOPLAM]
-    FROM LG_{firm}_{period}_KSLINES KSL WITH(NOLOCK)
-    LEFT JOIN LG_{firm}_KSCARD KS WITH(NOLOCK) 
-        ON KSL.CARDREF = KS.LOGICALREF
-    LEFT JOIN L_TRADGRP TRG WITH(NOLOCK) 
-        ON KSL.TRADINGGRP = TRG.GCODE
-    WHERE {where_sql}
-    GROUP BY TRG.GDEF, KSL.TRADINGGRP
-    ORDER BY [TOPLAM] DESC
-    """
-
-    with engine.connect() as conn:
-        df = pd.read_sql(text(sql_query), conn, params=params)
-
-    months = ['OCAK', 'SUBAT', 'MART', 'NISAN', 'MAYIS', 'HAZIRAN', 'TEMMUZ', 'AGUSTOS', 'EYLUL', 'EKIM', 'KASIM', 'ARALIK']
-    monthly_totals = {m: float(df[m].sum()) if not df.empty else 0.0 for m in months}
-    grand_total = float(df['TOPLAM'].sum()) if not df.empty else 0.0
-
-    # Kategorize Etme Mantığı
-    def categorize_trading_group(gcode, gdef):
-        name = str(gdef or '').upper()
-        if any(k in name for k in ['AKARYAKIT', 'ARAÇ', 'ARAC', 'NAKLİYE', 'NAKLIYE', 'SERVİS', 'SERVIS', 'YEDEK PARÇA', 'YEDEK PARCA', 'MUAYENE', 'SİGORTA', 'SIGORTA', 'HOWO', 'KAMYON', 'BİNEK', 'BINEK']):
-            return ('ARAÇ, ULAŞIM & AKARYAKIT GİDERLERİ', 'ARAÇ & ULAŞIM GİDERLERİ TOPLAMI', 1)
-        if any(k in name for k in ['AVANS']):
-            return ('PERSONEL AVANS GİDERLERİ', 'PERSONEL AVANS TOPLAMI', 3)
-        if any(k in name for k in ['MAAŞ', 'MAAS', 'MESAİ', 'MESAI', 'ÜCRET', 'UCRET', 'İKRAMİYE', 'IKRAMIYE', 'İZİN', 'IZIN', 'ÇALIŞMA İZNİ', 'OTURUM VERGİ', 'VİZE ÜCRET']):
-            return ('PERSONEL MAAŞ & ÖZLÜK GİDERLERİ', 'PERSONEL MAAŞ & ÖZLÜK TOPLAMI', 2)
-        if any(k in name for k in ['MALZEME', 'HURDA', 'SATICILAR', 'ALIMLARI']):
-            return ('OPERASYONEL SATINALMA & HURDA GİDERLERİ', 'SATINALMA & HURDA TOPLAMI', 4)
-        if any(k in name for k in ['MUTFAK', 'İAŞE', 'IASE', 'YEMEK', 'SU GİDER', 'TÜP GAZ', 'TUP GAZ', 'KİRA', 'KIRA', 'KIRTASİYE', 'OFİS', 'OFIS', 'İLETİŞİM', 'TELEFON', 'İNTERNET', 'KARGO', 'SEYAHAT', 'GÜMRÜK', 'GUMRUK', 'SAĞLIK', 'SAGLIK', 'DANIŞMANLIK', 'VERGİ', 'VERGI', 'TAMİR', 'TAMIR', 'BAĞIŞ', 'BAGIS']):
-            return ('İDARİ OFİS, TESİS & GENEL GİDERLER', 'İDARİ & TESİS GİDERLERİ TOPLAMI', 5)
-        return ('DİĞER OPERASYONEL GİDERLER', 'DİĞER GİDERLER TOPLAMI', 6)
-
-    records = df.to_dict(orient='records')
-    category_map = {}
-
-    for r in records:
-        cat_name, cat_lbl, cat_order = categorize_trading_group(r.get('GRUP_KODU'), r.get('TICARI_ISLEM_GRUBU'))
-        r['KATEGORI'] = cat_name
-        r['KATEGORI_LABEL'] = cat_lbl
-        r['KATEGORI_ORDER'] = cat_order
-
-        if cat_name not in category_map:
-            category_map[cat_name] = {
-                'name': cat_name,
-                'total_label': cat_lbl,
-                'order': cat_order,
+                try:
+                    return resp.json()
+                except Exception:
+                    pass
+            err_msg = f"Lokal SQL Köprüsünden veri alınamadı (HTTP {resp.status_code}). Bilgisayarınızda baslat_kopru.bat açık mı? Render'daki BRIDGE_URL güncel mi?"
+            return {
+                'success': False,
+                'message': err_msg,
                 'records': [],
-                'monthly_totals': {m: 0.0 for m in months},
-                'grand_total': 0.0
+                'categories': [],
+                'monthly_totals': {},
+                'grand_total': 0.0,
+                'count': 0,
+                'currency': 'DZD',
+                'year': 2026
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'message': f"Lokal SQL Köprüsüne bağlanılamadı ({str(e)}). Bilgisayarınızda baslat_kopru.bat açık mı?",
+                'records': [],
+                'categories': [],
+                'monthly_totals': {},
+                'grand_total': 0.0,
+                'count': 0,
+                'currency': 'DZD',
+                'year': 2026
             }
 
-        category_map[cat_name]['records'].append(r)
-        category_map[cat_name]['grand_total'] += float(r.get('TOPLAM', 0.0))
-        for m in months:
-            category_map[cat_name]['monthly_totals'][m] += float(r.get(m, 0.0))
+    try:
 
-    categories = list(category_map.values())
-    categories.sort(key=lambda x: x['order'])
+        filters = filters or {}
+        fp = get_active_firm_period(conn_id)
+        firm = fp.get('firm_nr', '225')
+        period = fp.get('period_nr', '01')
+        engine = get_engine(conn_id)
+        active_curr = get_active_currency(conn_id) or 'DZD'
 
-    return {
-        'success': True,
-        'records': records,
-        'categories': categories,
-        'monthly_totals': monthly_totals,
-        'grand_total': grand_total,
-        'count': len(records),
-        'currency': active_curr,
-        'year': year
-    }
+        year = filters.get('year')
+        try:
+            year = int(year) if year else 2026
+        except (ValueError, TypeError):
+            year = 2026
+
+        kasa_kodu = filters.get('kasa_kodu')
+        direction = (filters.get('direction') or 'all').lower()
+        include_empty = filters.get('include_empty', True)
+        if isinstance(include_empty, str):
+            include_empty = include_empty.lower() in ['true', '1', 'yes']
+
+        where_clauses = ["YEAR(KSL.DATE_) = :year"]
+        params = {'year': year}
+
+        if kasa_kodu and kasa_kodu != 'ALL' and str(kasa_kodu).strip():
+            where_clauses.append("KS.CODE = :kasa_kodu")
+            params['kasa_kodu'] = str(kasa_kodu).strip()
+
+        if direction == 'cikis':
+            where_clauses.append("KSL.SIGN = 1")
+        elif direction == 'giris':
+            where_clauses.append("KSL.SIGN = 0")
+
+        if not include_empty:
+            where_clauses.append("ISNULL(LTRIM(RTRIM(KSL.TRADINGGRP)), '') <> ''")
+
+        where_sql = " AND ".join(where_clauses)
+
+        sql_query = f"""
+        SELECT 
+            COALESCE(NULLIF(LTRIM(RTRIM(TRG.GDEF)), ''), NULLIF(LTRIM(RTRIM(KSL.TRADINGGRP)), ''), '(Grup Belirtilmemiş)') AS [TICARI_ISLEM_GRUBU],
+            ISNULL(NULLIF(LTRIM(RTRIM(KSL.TRADINGGRP)), ''), '-') AS [GRUP_KODU],
+            ISNULL(SUM(CASE WHEN MONTH(KSL.DATE_) = 1 THEN KSL.AMOUNT ELSE 0 END), 0) AS [OCAK],
+            ISNULL(SUM(CASE WHEN MONTH(KSL.DATE_) = 2 THEN KSL.AMOUNT ELSE 0 END), 0) AS [SUBAT],
+            ISNULL(SUM(CASE WHEN MONTH(KSL.DATE_) = 3 THEN KSL.AMOUNT ELSE 0 END), 0) AS [MART],
+            ISNULL(SUM(CASE WHEN MONTH(KSL.DATE_) = 4 THEN KSL.AMOUNT ELSE 0 END), 0) AS [NISAN],
+            ISNULL(SUM(CASE WHEN MONTH(KSL.DATE_) = 5 THEN KSL.AMOUNT ELSE 0 END), 0) AS [MAYIS],
+            ISNULL(SUM(CASE WHEN MONTH(KSL.DATE_) = 6 THEN KSL.AMOUNT ELSE 0 END), 0) AS [HAZIRAN],
+            ISNULL(SUM(CASE WHEN MONTH(KSL.DATE_) = 7 THEN KSL.AMOUNT ELSE 0 END), 0) AS [TEMMUZ],
+            ISNULL(SUM(CASE WHEN MONTH(KSL.DATE_) = 8 THEN KSL.AMOUNT ELSE 0 END), 0) AS [AGUSTOS],
+            ISNULL(SUM(CASE WHEN MONTH(KSL.DATE_) = 9 THEN KSL.AMOUNT ELSE 0 END), 0) AS [EYLUL],
+            ISNULL(SUM(CASE WHEN MONTH(KSL.DATE_) = 10 THEN KSL.AMOUNT ELSE 0 END), 0) AS [EKIM],
+            ISNULL(SUM(CASE WHEN MONTH(KSL.DATE_) = 11 THEN KSL.AMOUNT ELSE 0 END), 0) AS [KASIM],
+            ISNULL(SUM(CASE WHEN MONTH(KSL.DATE_) = 12 THEN KSL.AMOUNT ELSE 0 END), 0) AS [ARALIK],
+            ISNULL(SUM(KSL.AMOUNT), 0) AS [TOPLAM]
+        FROM LG_{firm}_{period}_KSLINES KSL WITH(NOLOCK)
+        LEFT JOIN LG_{firm}_KSCARD KS WITH(NOLOCK) 
+            ON KSL.CARDREF = KS.LOGICALREF
+        LEFT JOIN L_TRADGRP TRG WITH(NOLOCK) 
+            ON KSL.TRADINGGRP = TRG.GCODE
+        WHERE {where_sql}
+        GROUP BY TRG.GDEF, KSL.TRADINGGRP
+        ORDER BY [TOPLAM] DESC
+        """
+
+        with engine.connect() as conn:
+            df = pd.read_sql(text(sql_query), conn, params=params)
+
+        months = ['OCAK', 'SUBAT', 'MART', 'NISAN', 'MAYIS', 'HAZIRAN', 'TEMMUZ', 'AGUSTOS', 'EYLUL', 'EKIM', 'KASIM', 'ARALIK']
+        monthly_totals = {m: float(df[m].sum()) if not df.empty else 0.0 for m in months}
+        grand_total = float(df['TOPLAM'].sum()) if not df.empty else 0.0
+
+        # Kategorize Etme Mantığı
+        def categorize_trading_group(gcode, gdef):
+            name = str(gdef or '').upper()
+            if any(k in name for k in ['AKARYAKIT', 'ARAÇ', 'ARAC', 'NAKLİYE', 'NAKLIYE', 'SERVİS', 'SERVIS', 'YEDEK PARÇA', 'YEDEK PARCA', 'MUAYENE', 'SİGORTA', 'SIGORTA', 'HOWO', 'KAMYON', 'BİNEK', 'BINEK']):
+                return ('ARAÇ, ULAŞIM & AKARYAKIT GİDERLERİ', 'ARAÇ & ULAŞIM GİDERLERİ TOPLAMI', 1)
+            if any(k in name for k in ['AVANS']):
+                return ('PERSONEL AVANS GİDERLERİ', 'PERSONEL AVANS TOPLAMI', 3)
+            if any(k in name for k in ['MAAŞ', 'MAAS', 'MESAİ', 'MESAI', 'ÜCRET', 'UCRET', 'İKRAMİYE', 'IKRAMIYE', 'İZİN', 'IZIN', 'ÇALIŞMA İZNİ', 'OTURUM VERGİ', 'VİZE ÜCRET']):
+                return ('PERSONEL MAAŞ & ÖZLÜK GİDERLERİ', 'PERSONEL MAAŞ & ÖZLÜK TOPLAMI', 2)
+            if any(k in name for k in ['MALZEME', 'HURDA', 'SATICILAR', 'ALIMLARI']):
+                return ('OPERASYONEL SATINALMA & HURDA GİDERLERİ', 'SATINALMA & HURDA TOPLAMI', 4)
+            if any(k in name for k in ['MUTFAK', 'İAŞE', 'IASE', 'YEMEK', 'SU GİDER', 'TÜP GAZ', 'TUP GAZ', 'KİRA', 'KIRA', 'KIRTASİYE', 'OFİS', 'OFIS', 'İLETİŞİM', 'TELEFON', 'İNTERNET', 'KARGO', 'SEYAHAT', 'GÜMRÜK', 'GUMRUK', 'SAĞLIK', 'SAGLIK', 'DANIŞMANLIK', 'VERGİ', 'VERGI', 'TAMİR', 'TAMIR', 'BAĞIŞ', 'BAGIS']):
+                return ('İDARİ OFİS, TESİS & GENEL GİDERLER', 'İDARİ & TESİS GİDERLERİ TOPLAMI', 5)
+            return ('DİĞER OPERASYONEL GİDERLER', 'DİĞER GİDERLER TOPLAMI', 6)
+
+        records = df.to_dict(orient='records')
+        category_map = {}
+
+        for r in records:
+            cat_name, cat_lbl, cat_order = categorize_trading_group(r.get('GRUP_KODU'), r.get('TICARI_ISLEM_GRUBU'))
+            r['KATEGORI'] = cat_name
+            r['KATEGORI_LABEL'] = cat_lbl
+            r['KATEGORI_ORDER'] = cat_order
+
+            if cat_name not in category_map:
+                category_map[cat_name] = {
+                    'name': cat_name,
+                    'total_label': cat_lbl,
+                    'order': cat_order,
+                    'records': [],
+                    'monthly_totals': {m: 0.0 for m in months},
+                    'grand_total': 0.0
+                }
+
+            category_map[cat_name]['records'].append(r)
+            category_map[cat_name]['grand_total'] += float(r.get('TOPLAM', 0.0))
+            for m in months:
+                category_map[cat_name]['monthly_totals'][m] += float(r.get(m, 0.0))
+
+        categories = list(category_map.values())
+        categories.sort(key=lambda x: x['order'])
+
+        return {
+            'success': True,
+            'records': records,
+            'categories': categories,
+            'monthly_totals': monthly_totals,
+            'grand_total': grand_total,
+            'count': len(records),
+            'currency': active_curr,
+            'year': year
+        }
+    except Exception as e:
+        return {
+            'success': False,
+            'message': f"Veritabanı sorgu hatası: {str(e)}",
+            'records': [],
+            'categories': [],
+            'monthly_totals': {},
+            'grand_total': 0.0,
+            'count': 0,
+            'currency': 'DZD',
+            'year': 2026
+        }
 
 def export_kasa_analizi_to_excel(filters=None, conn_id=1):
     """
@@ -853,18 +1004,28 @@ def get_kasa_analiz_drilldown(filters=None, conn_id=1, force_local=False):
     Kasa Analiz tablosunda tıklanan ay ve ticari işlem grubuna ait detay kasa hareket satırlarını (fişleri) getirir.
     all_groups=True ise o ayın TÜM gruplarına ait satırları getirir (aylık toplam hücresine tıklanınca).
     """
-    if not force_local and USE_BRIDGE and BRIDGE_URL:
+    bridge_url, bridge_key, is_render, use_bridge = get_bridge_config()
+    if not force_local and (use_bridge or is_render):
+        if not bridge_url:
+            return {'success': False, 'message': 'BRIDGE_URL tanımlanmamış. Köprü bağlantısı bekleniyor.', 'lines': [], 'count': 0, 'total': 0.0}
         try:
             resp = http_requests.post(
-                f"{BRIDGE_URL}/bridge/kasa/analiz-drilldown",
+                f"{bridge_url}/bridge/kasa/analiz-drilldown",
                 json=filters or {},
-                headers={'X-Bridge-Key': BRIDGE_KEY, 'ngrok-skip-browser-warning': 'true'},
+                headers={'X-Bridge-Key': bridge_key, 'ngrok-skip-browser-warning': 'true', 'User-Agent': 'NexlogBridgeClient/1.0'},
                 timeout=30
             )
             if resp.status_code == 200:
-                return resp.json()
+                try:
+                    return resp.json()
+                except Exception:
+                    pass
+            else:
+                print(f"Bridge get_kasa_analiz_drilldown status code: {resp.status_code}")
         except Exception as e:
             print(f"Bridge get_kasa_analiz_drilldown hatası: {e}")
+        if is_render:
+            return {'success': False, 'message': f'Lokal SQL Köprüsüne bağlanılamadı ({bridge_url or "URL yok"}). Lütfen baslat_kopru.bat dosyasının açık olduğundan emin olun.', 'lines': [], 'count': 0, 'total': 0.0}
 
     if filters is None:
         filters = {}
@@ -983,32 +1144,46 @@ def get_kasa_analiz_drilldown(filters=None, conn_id=1, force_local=False):
     ORDER BY KSL.DATE_ ASC, KSL.AMOUNT DESC
     """
 
-    engine = get_engine(conn_id)
-    with engine.connect() as conn:
-        df = pd.read_sql(text(sql_query), conn, params=params)
+    try:
+        engine = get_engine(conn_id)
+        with engine.connect() as conn:
+            df = pd.read_sql(text(sql_query), conn, params=params)
 
-    if not df.empty:
-        df['Açıklama'] = df.apply(
-            lambda r: combine_invoice_and_kasa_descriptions(
-                r.get('INV_GENEXP_ALL'),
-                r.get('STL_LINEEXP_ALL'),
-                r.get('KSL_LINEEXP')
-            ), axis=1
-        )
-        df.drop(columns=['INV_GENEXP_ALL', 'STL_LINEEXP_ALL', 'KSL_LINEEXP'], inplace=True, errors='ignore')
-    else:
-        df['Açıklama'] = ''
+        if not df.empty:
+            df['Açıklama'] = df.apply(
+                lambda r: combine_invoice_and_kasa_descriptions(
+                    r.get('INV_GENEXP_ALL'),
+                    r.get('STL_LINEEXP_ALL'),
+                    r.get('KSL_LINEEXP')
+                ), axis=1
+            )
+            df.drop(columns=['INV_GENEXP_ALL', 'STL_LINEEXP_ALL', 'KSL_LINEEXP'], inplace=True, errors='ignore')
+        else:
+            df['Açıklama'] = ''
 
-    lines = df.to_dict(orient='records')
-    total_amount = float(df['Tutar'].sum()) if not df.empty else 0.0
+        lines = df.to_dict(orient='records')
+        total_amount = float(df['Tutar'].sum()) if not df.empty else 0.0
 
-    return {
-        'success': True,
-        'lines': lines,
-        'count': len(lines),
-        'total': total_amount,
-        'currency': local_curcode,
-        'trading_grp': trading_grp,
-        'year': year,
-        'month': month
-    }
+        return {
+            'success': True,
+            'lines': lines,
+            'count': len(lines),
+            'total': total_amount,
+            'currency': local_curcode,
+            'trading_grp': trading_grp,
+            'year': year,
+            'month': month
+        }
+    except Exception as e:
+        print(f"get_kasa_analiz_drilldown SQL hatası: {e}")
+        return {
+            'success': False,
+            'message': str(e),
+            'lines': [],
+            'count': 0,
+            'total': 0.0,
+            'currency': local_curcode,
+            'trading_grp': trading_grp,
+            'year': year,
+            'month': month
+        }

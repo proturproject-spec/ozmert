@@ -630,7 +630,15 @@ async function loadAnalizData() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(filters)
         });
-        const data = await resp.json();
+
+        let data;
+        const contentType = resp.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+            data = await resp.json();
+        } else {
+            const text = await resp.text();
+            throw new Error(resp.ok ? 'Geçersiz veri formatı alındı.' : `Sunucu hatası (HTTP ${resp.status}). Lokal SQL köprüsü açık mı?`);
+        }
 
         if (data.success) {
             cachedData = data;
@@ -642,7 +650,11 @@ async function loadAnalizData() {
             renderError(data.message || 'Veri yüklenemedi.');
         }
     } catch(e) {
-        renderError('Bağlantı hatası: ' + e.message);
+        let errMsg = e.message || 'Bağlantı hatası oluştu.';
+        if (errMsg.includes('Unexpected token') || errMsg.includes('JSON')) {
+            errMsg = "Lokal SQL Köprüsüne bağlanılamadı. Lütfen sunucu/bilgisayarınızda baslat_kopru.bat'ın çalıştığından emin olun.";
+        }
+        renderError(errMsg);
     } finally {
         loading.style.display = 'none';
     }
@@ -806,7 +818,15 @@ async function openDrillDown(kalemAdi, grupKodu, month, year) {
                 direction:    direction
             })
         });
-        const data = await resp.json();
+
+        let data;
+        const contentType = resp.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+            data = await resp.json();
+        } else {
+            const text = await resp.text();
+            throw new Error(resp.ok ? 'Geçersiz veri formatı alındı.' : `Sunucu hatası (HTTP ${resp.status}). Lokal SQL köprüsü açık mı?`);
+        }
 
         if (data.success && data.lines && data.lines.length > 0) {
             const curr = data.currency || currentCurrency;
@@ -845,12 +865,17 @@ async function openDrillDown(kalemAdi, grupKodu, month, year) {
             dCount.textContent = data.count.toLocaleString('tr-TR') + ' kayıt';
             dTotal.textContent = 'Toplam: ' + fmtCurr(data.total);
         } else {
-            dTbody.innerHTML = `<tr><td colspan="7" style="padding:2.5rem;text-align:center;color:var(--text-muted);">📭 Bu dönem için detay kayıt bulunamadı.</td></tr>`;
+            const emptyMsg = data && data.message ? data.message : 'Bu dönem için detay kayıt bulunamadı.';
+            dTbody.innerHTML = `<tr><td colspan="7" style="padding:2.5rem;text-align:center;color:var(--text-muted);">📭 ${escHtml(emptyMsg)}</td></tr>`;
             dCount.textContent = '0 kayıt';
             dTotal.textContent = fmtCurr(0);
         }
     } catch(e) {
-        dTbody.innerHTML = `<tr><td colspan="7" style="padding:2rem;text-align:center;color:#f87171;">⚠️ Bağlantı hatası: ${escHtml(e.message)}</td></tr>`;
+        let errMsg = e.message || 'Bağlantı hatası oluştu.';
+        if (errMsg.includes('Unexpected token') || errMsg.includes('JSON')) {
+            errMsg = "Lokal SQL Köprüsüne bağlanılamadı. Lütfen sunucu/bilgisayarınızda baslat_kopru.bat'ın çalıştığından emin olun.";
+        }
+        dTbody.innerHTML = `<tr><td colspan="7" style="padding:2rem;text-align:center;color:#f87171;">⚠️ ${escHtml(errMsg)}</td></tr>`;
     }
 }
 
