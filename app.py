@@ -16,6 +16,7 @@ from db_manager import (
     get_logo_currencies, load_general_settings, save_general_settings, get_active_currency
 )
 import auth_logger
+import permissions_manager
 
 # ============================================================
 # HASSAS VERİLER VE ORTAM DEĞİŞKENLERİ ZORUNLULUĞU
@@ -277,7 +278,8 @@ def login():
                 'username': user.get('username'),
                 'name': user.get('name', username),
                 'role': user.get('role', 'user'),
-                'allowed_pages': user.get('allowed_pages', ['index', 'muhasebe', 'cari_ekstre', 'cari_kapama', 'tahsilat_takip', 'nakit_akis', 'finans', 'raporlar']) if user.get('role') != 'admin' else ['*']
+                'allowed_pages': user.get('allowed_pages', ['index', 'muhasebe', 'cari_ekstre', 'cari_kapama', 'tahsilat_takip', 'nakit_akis', 'finans', 'raporlar']) if user.get('role') != 'admin' else ['*'],
+                'allowed_kasalar': user.get('allowed_kasalar', ['*']) if user.get('role') != 'admin' else ['*']
             }
             session['last_active'] = time.time()
             # Giriş Logunu Kaydet
@@ -499,7 +501,7 @@ import kasa_hareketleri
 @app.route('/kasa-hareketleri')
 @login_required
 def kasa_hareketleri_view():
-    kasalar = kasa_hareketleri.get_kasa_kartlari()
+    kasalar = kasa_hareketleri.get_kasa_kartlari(user=session.get('user'))
     active_currency = get_active_currency(1)
     return render_template('kasa_hareketleri.html', aktif_sayfa='kasa_hareketleri', kasalar=kasalar, active_currency=active_currency)
 
@@ -513,7 +515,7 @@ def kasa_raporu_view():
 @app.route('/kasa-analizi')
 @login_required
 def kasa_analizi_view():
-    kasalar = kasa_hareketleri.get_kasa_kartlari()
+    kasalar = kasa_hareketleri.get_kasa_kartlari(user=session.get('user'))
     active_currency = get_active_currency(1)
     return render_template('kasa_analizi.html', 
                            aktif_sayfa='kasa_analizi', 
@@ -535,7 +537,7 @@ def api_kasa_analizi_data():
                 'direction': request.args.get('direction', 'all'),
                 'include_empty': request.args.get('include_empty', 'true') in ['true', 'True', '1']
             }
-        res = kasa_hareketleri.get_kasa_ticari_grup_analizi(filters)
+        res = kasa_hareketleri.get_kasa_ticari_grup_analizi(filters, user=session.get('user'))
         return jsonify(res)
     except Exception as e:
         print(f"api_kasa_analizi_data error: {e}")
@@ -556,7 +558,7 @@ def api_kasa_analizi_drilldown():
                 'kasa_kodu': request.args.get('kasa_kodu'),
                 'direction': request.args.get('direction', 'cikis')
             }
-        res = kasa_hareketleri.get_kasa_analiz_drilldown(filters)
+        res = kasa_hareketleri.get_kasa_analiz_drilldown(filters, user=session.get('user'))
         return jsonify(res)
     except Exception as e:
         print(f"api_kasa_analizi_drilldown error: {e}")
@@ -571,7 +573,7 @@ def api_kasa_analizi_export():
         'direction': request.args.get('direction', 'all'),
         'include_empty': request.args.get('include_empty', 'true') in ['true', 'True', '1']
     }
-    output = kasa_hareketleri.export_kasa_analizi_to_excel(filters)
+    output = kasa_hareketleri.export_kasa_analizi_to_excel(filters, user=session.get('user'))
     year = filters.get('year') or 2026
     filename = f"Kasa_Analizi_Ticari_Grup_{year}.xlsx"
     return send_file(
@@ -596,7 +598,7 @@ def api_kasa_hareketleri_data():
                 'search': request.args.get('search'),
                 'limit': request.args.get('limit', 2000)
             }
-        res = kasa_hareketleri.get_kasa_data_and_summary(filters=filters)
+        res = kasa_hareketleri.get_kasa_data_and_summary(filters=filters, user=session.get('user'))
         return jsonify(res)
     except Exception as e:
         print(f"api_kasa_hareketleri_data error: {e}")
@@ -612,7 +614,7 @@ def api_kasa_hareketleri_export():
         'trcode': request.args.get('trcode'),
         'search': request.args.get('search')
     }
-    output = kasa_hareketleri.export_kasa_to_excel(filters=filters)
+    output = kasa_hareketleri.export_kasa_to_excel(filters=filters, user=session.get('user'))
     filename = f"kasa_hareketleri_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     return send_file(
         output,
@@ -633,7 +635,7 @@ def api_kasa_raporu_data():
                 'end_date': request.args.get('end_date'),
                 'search': request.args.get('search')
             }
-        res = kasa_hareketleri.get_kasa_ozet_raporu(filters=filters)
+        res = kasa_hareketleri.get_kasa_ozet_raporu(filters=filters, user=session.get('user'))
         return jsonify(res)
     except Exception as e:
         print(f"api_kasa_raporu_data error: {e}")
@@ -647,7 +649,7 @@ def api_kasa_raporu_export():
         'end_date': request.args.get('end_date'),
         'search': request.args.get('search')
     }
-    output = kasa_hareketleri.export_kasa_raporu_to_excel(filters=filters)
+    output = kasa_hareketleri.export_kasa_raporu_to_excel(filters=filters, user=session.get('user'))
     filename = f"kasa_bakiye_raporu_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     return send_file(
         output,
@@ -994,13 +996,15 @@ def parametreler():
     cari_settings = cari_hesap_ekstresi.load_cari_settings()
     general_settings = load_general_settings()
     logo_currencies = get_logo_currencies(1)
+    all_kasalar = kasa_hareketleri.get_kasa_kartlari(conn_id=1, ignore_permission=True)
     # Şifre hash'lerini frontend'e göndermemek için temiz liste oluştur
     users = [
         {
             'username': u.get('username'),
             'name': u.get('name', u.get('username')),
             'role': u.get('role', 'user'),
-            'allowed_pages': u.get('allowed_pages', ['index', 'muhasebe', 'cari_ekstre', 'cari_kapama', 'tahsilat_takip', 'nakit_akis', 'finans', 'raporlar']) if u.get('role') != 'admin' else ['*']
+            'allowed_pages': u.get('allowed_pages', ['index', 'muhasebe', 'cari_ekstre', 'cari_kapama', 'tahsilat_takip', 'nakit_akis', 'finans', 'raporlar']) if u.get('role') != 'admin' else ['*'],
+            'allowed_kasalar': u.get('allowed_kasalar', ['*']) if u.get('role') != 'admin' else ['*']
         }
         for u in users_raw
     ]
@@ -1009,6 +1013,7 @@ def parametreler():
         aktif_sayfa='parametreler',
         connections=connections,
         users=users,
+        all_kasalar=all_kasalar,
         system_pages=ALL_SYSTEM_PAGES,
         cari_settings=cari_settings,
         general_settings=general_settings,
@@ -1087,6 +1092,7 @@ def add_user_api():
     password = data.get('password', '')
     role = data.get('role', 'user')
     allowed_pages = data.get('allowed_pages', [])
+    allowed_kasalar = data.get('allowed_kasalar', ['*'])
 
     if not username or not password:
         return jsonify({'success': False, 'message': 'Kullanıcı adı ve şifre zorunludur.'}), 400
@@ -1101,15 +1107,20 @@ def add_user_api():
 
     if role == 'admin':
         allowed_pages = ['*']
+        allowed_kasalar = ['*']
     elif not allowed_pages:
         allowed_pages = ['index', 'muhasebe', 'cari_ekstre', 'cari_kapama', 'tahsilat_takip', 'finans', 'raporlar']
+
+    if not allowed_kasalar:
+        allowed_kasalar = ['*']
 
     users.append({
         'username': username,
         'name': name,
         'password_hash': generate_password_hash(password),
         'role': role,
-        'allowed_pages': allowed_pages
+        'allowed_pages': allowed_pages,
+        'allowed_kasalar': allowed_kasalar
     })
 
     if save_users(users):
@@ -1126,6 +1137,7 @@ def edit_user_permissions_api():
     name = data.get('name', '').strip()
     role = data.get('role', 'user')
     allowed_pages = data.get('allowed_pages', [])
+    allowed_kasalar = data.get('allowed_kasalar', ['*'])
 
     if not target_username:
         return jsonify({'success': False, 'message': 'Kullanıcı adı belirtilmedi.'}), 400
@@ -1138,6 +1150,7 @@ def edit_user_permissions_api():
                 u['name'] = name
             u['role'] = role
             u['allowed_pages'] = ['*'] if role == 'admin' else allowed_pages
+            u['allowed_kasalar'] = ['*'] if role == 'admin' else (allowed_kasalar or ['*'])
             user_found = True
             
             # Eğer kendi oturumumuz güncelleniyorsa session'ı da güncelle
@@ -1145,6 +1158,7 @@ def edit_user_permissions_api():
                 session['user']['name'] = u['name']
                 session['user']['role'] = role
                 session['user']['allowed_pages'] = u['allowed_pages']
+                session['user']['allowed_kasalar'] = u['allowed_kasalar']
             break
 
     if user_found and save_users(users):

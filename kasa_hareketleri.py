@@ -9,6 +9,7 @@ import pandas as pd
 from sqlalchemy import text
 import db_manager
 from db_manager import get_engine, get_active_firm_period, get_logo_currencies, get_active_currency
+import permissions_manager
 
 def get_bridge_config():
     """Çalışma anında ortam değişkenlerini dinamik okur."""
@@ -22,8 +23,9 @@ BRIDGE_URL = os.environ.get('BRIDGE_URL', '').rstrip('/')
 BRIDGE_KEY = os.environ.get('BRIDGE_API_KEY') or 'nexlog_bridge_2026_secure_xKj9'
 USE_BRIDGE = bool(BRIDGE_URL)
 
-def get_kasa_kartlari(conn_id=1, force_local=False):
-    """Tanımlı aktif kasaları döner."""
+def get_kasa_kartlari(conn_id=1, force_local=False, user=None, ignore_permission=False):
+    """Tanımlı aktif kasaları döner. İsteğe göre kullanıcının yetkili olduğu kasaları süzer."""
+    cards = []
     bridge_url, bridge_key, is_render, use_bridge = get_bridge_config()
     if not force_local and (use_bridge or is_render):
         if not bridge_url:
@@ -36,25 +38,32 @@ def get_kasa_kartlari(conn_id=1, force_local=False):
             )
             if resp.status_code == 200:
                 try:
-                    return resp.json()
+                    cards = resp.json()
                 except Exception:
                     pass
         except Exception as e:
             print(f"Bridge kasa kartlari hatası: {e}")
         if is_render:
-            return []
+            if not ignore_permission:
+                return permissions_manager.filter_items_by_permission(cards, 'kasalar', code_key='CODE', user=user)
+            return cards
 
-    try:
-        fp = get_active_firm_period(conn_id)
-        firm = fp.get('firm_nr', '225')
-        engine = get_engine(conn_id)
-        q = f"SELECT CODE, NAME FROM LG_{firm}_KSCARD WITH(NOLOCK) WHERE ACTIVE = 0 ORDER BY CODE"
-        with engine.connect() as conn:
-            df = pd.read_sql(text(q), conn)
-            return df.to_dict(orient='records')
-    except Exception as e:
-        print(f"Kasa kartları getirme hatası: {e}")
-        return []
+    if not cards:
+        try:
+            fp = get_active_firm_period(conn_id)
+            firm = fp.get('firm_nr', '225')
+            engine = get_engine(conn_id)
+            q = f"SELECT CODE, NAME FROM LG_{firm}_KSCARD WITH(NOLOCK) WHERE ACTIVE = 0 ORDER BY CODE"
+            with engine.connect() as conn:
+                df = pd.read_sql(text(q), conn)
+                cards = df.to_dict(orient='records')
+        except Exception as e:
+            print(f"Kasa kartları getirme hatası: {e}")
+            cards = []
+
+    if not ignore_permission:
+        return permissions_manager.filter_items_by_permission(cards, 'kasalar', code_key='CODE', user=user)
+    return cards
 
 def combine_invoice_and_kasa_descriptions(*parts):
     """
@@ -84,7 +93,7 @@ def combine_invoice_and_kasa_descriptions(*parts):
                 cleaned.append(s)
     return ' - '.join(cleaned)
 
-def get_kasa_hareketleri_df(filters=None, limit=2000, conn_id=1):
+def get_kasa_hareketleri_df(filters=None, limit=2000, conn_id=1, user=None):
     """
     Filtrelere göre kasa hareketlerini DataFrame olarak döner.
     filters: dict {
@@ -93,7 +102,8 @@ def get_kasa_hareketleri_df(filters=None, limit=2000, conn_id=1):
         'kasa_kodu': str,
         'islem_turu': int,
         'search': str,
-        'limit': int (None for all)
+        'limit': int (None for all),
+        'allowed_kasalar': list (opsiyonel)
     }
     """
     filters = filters or {}
@@ -113,6 +123,15 @@ def get_kasa_hareketleri_df(filters=None, limit=2000, conn_id=1):
         'local_curtype': local_curtype,
         'local_curcode': local_curcode
     }
+
+    # Kullanıcı Kasa Yetki Filtresi (DBAC)
+    allowed_kasalar = filters.get('allowed_kasalar')
+    if allowed_kasalar is None:
+        allowed_kasalar = permissions_manager.get_user_allowed_items('kasalar', user)
+
+    kasa_perm_sql = permissions_manager.build_sql_dimension_filter('kasalar', 'KS.CODE', user=user, allowed_items=allowed_kasalar)
+    if kasa_perm_sql:
+        where_clauses.append(kasa_perm_sql)
 
     start_date = filters.get('start_date')
     if start_date:
@@ -292,7 +311,7 @@ def get_kasa_hareketleri_df(filters=None, limit=2000, conn_id=1):
             df['Açıklama'] = ''
         return df
 
-def get_kasa_devir(filters=None, conn_id=1):
+def get_kasa_devir(filters=None, conn_id=1, user=None):
     """
     Filtrelerdeki start_date öncesindeki kasa bakiye devrini hesaplar.
     Eğer start_date verilmemişse devir 0.0 döner.
@@ -311,6 +330,14 @@ def get_kasa_devir(filters=None, conn_id=1):
     
     where_clauses = ["KSL.CANCELLED = 0", "CAST(KSL.DATE_ AS DATE) < :start_date"]
     params = {'start_date': start_date}
+
+    allowed_kasalar = filters.get('allowed_kasalar')
+    if allowed_kasalar is None:
+        allowed_kasalar = permissions_manager.get_user_allowed_items('kasalar', user)
+
+    kasa_perm_sql = permissions_manager.build_sql_dimension_filter('kasalar', 'KS.CODE', user=user, allowed_items=allowed_kasalar)
+    if kasa_perm_sql:
+        where_clauses.append(kasa_perm_sql)
     
     if kasa_kodu:
         where_clauses.append("KS.CODE = :kasa_kodu")
@@ -332,8 +359,14 @@ def get_kasa_devir(filters=None, conn_id=1):
         print(f"Devir bakiye hesaplama hatası: {e}")
         return 0.0
 
-def get_kasa_data_and_summary(filters=None, limit=2000, conn_id=1, force_local=False):
+def get_kasa_data_and_summary(filters=None, limit=2000, conn_id=1, force_local=False, user=None):
     """Web arayüzü için veri listesi, devir ve kümülatif bakiye ile özet KPI toplamlarını döner."""
+    filters = dict(filters or {})
+    allowed_kasalar = filters.get('allowed_kasalar')
+    if allowed_kasalar is None:
+        allowed_kasalar = permissions_manager.get_user_allowed_items('kasalar', user)
+    filters['allowed_kasalar'] = allowed_kasalar
+
     bridge_url, bridge_key, is_render, use_bridge = get_bridge_config()
     if not force_local and (use_bridge or is_render):
         if not bridge_url:
@@ -346,7 +379,7 @@ def get_kasa_data_and_summary(filters=None, limit=2000, conn_id=1, force_local=F
                 'kpi': {'toplam_giris': 0, 'toplam_cikis': 0, 'net_bakiye': 0, 'kayit_sayisi': 0, 'devir_bakiye': 0, 'son_bakiye': 0}
             }
         try:
-            payload = dict(filters or {})
+            payload = dict(filters)
             if limit: payload['limit'] = limit
             resp = http_requests.post(
                 f"{bridge_url}/bridge/kasa/data-summary",
@@ -356,7 +389,27 @@ def get_kasa_data_and_summary(filters=None, limit=2000, conn_id=1, force_local=F
             )
             if resp.status_code == 200:
                 try:
-                    return resp.json()
+                    res = resp.json()
+                    # Savunma derinliği: Köprüden gelen veriyi kullanıcı yetkisine göre kontrol et
+                    if '*' not in allowed_kasalar and res and res.get('success'):
+                        allowed_set = set(str(x).strip() for x in allowed_kasalar)
+                        records = [r for r in res.get('records', []) if str(r.get('Kasa Kodu', '')).strip() in allowed_set]
+                        total_giris = sum(float(r.get('Giriş (Borç)', 0) or 0) for r in records)
+                        total_cikis = sum(float(r.get('Çıkış (Alacak)', 0) or 0) for r in records)
+                        net_bakiye = total_giris - total_cikis
+                        res['records'] = records
+                        res['count'] = len(records)
+                        if 'summary' in res:
+                            res['summary']['total_giris'] = total_giris
+                            res['summary']['total_cikis'] = total_cikis
+                            res['summary']['net_bakiye'] = net_bakiye
+                            res['summary']['count'] = len(records)
+                        if 'kpi' in res:
+                            res['kpi']['toplam_giris'] = total_giris
+                            res['kpi']['toplam_cikis'] = total_cikis
+                            res['kpi']['net_bakiye'] = net_bakiye
+                            res['kpi']['kayit_sayisi'] = len(records)
+                    return res
                 except Exception:
                     pass
             err_msg = f"Lokal SQL Köprüsünden veri alınamadı (HTTP {resp.status_code}). Bilgisayarınızda baslat_kopru.bat açık mı? Render BRIDGE_URL güncel mi?"
@@ -380,8 +433,8 @@ def get_kasa_data_and_summary(filters=None, limit=2000, conn_id=1, force_local=F
             }
 
     try:
-        df = get_kasa_hareketleri_df(filters, limit=limit, conn_id=conn_id)
-        devir = get_kasa_devir(filters, conn_id=conn_id)
+        df = get_kasa_hareketleri_df(filters, limit=limit, conn_id=conn_id, user=user)
+        devir = get_kasa_devir(filters, conn_id=conn_id, user=user)
 
         total_giris = float(df['Giriş (Borç)'].sum()) if not df.empty else 0.0
         total_cikis = float(df['Çıkış (Alacak)'].sum()) if not df.empty else 0.0
@@ -452,9 +505,9 @@ def get_kasa_data_and_summary(filters=None, limit=2000, conn_id=1, force_local=F
             'kpi': {'toplam_giris': 0, 'toplam_cikis': 0, 'net_bakiye': 0, 'kayit_sayisi': 0, 'devir_bakiye': 0, 'son_bakiye': 0}
         }
 
-def export_kasa_to_excel(filters=None, conn_id=1):
+def export_kasa_to_excel(filters=None, conn_id=1, user=None):
     """Filtrelenmiş kasa hareketlerini kullanıcının istediği 11 sütun ve DEVİR formatında Excel olarak üretir."""
-    data_res = get_kasa_data_and_summary(filters, limit=None, conn_id=conn_id)
+    data_res = get_kasa_data_and_summary(filters, limit=None, conn_id=conn_id, user=user)
     records = data_res.get('records', [])
     devir = data_res.get('devir', 0.0)
     active_curr = data_res.get('summary', {}).get('currency', 'DZD')
@@ -525,11 +578,40 @@ def export_kasa_to_excel(filters=None, conn_id=1):
     output.seek(0)
     return output
 
-def get_kasa_ozet_raporu(filters=None, conn_id=1, force_local=False):
+def filter_ozet_raporu_by_permission(res, user=None, allowed_kasalar=None):
+    """Kasa özet raporunu kullanıcının izinli olduğu kasalara göre filtreler ve toplamları yeniden hesaplar."""
+    if not res or not res.get('success'):
+        return res
+    if allowed_kasalar is None:
+        allowed_kasalar = permissions_manager.get_user_allowed_items('kasalar', user)
+    if '*' in allowed_kasalar:
+        return res
+    allowed_set = set(str(x).strip() for x in allowed_kasalar)
+    filtered = [r for r in res.get('records', []) if str(r.get('KODU', '')).strip() in allowed_set]
+    total_giren = sum(float(r.get('GİREN') or 0) for r in filtered)
+    total_cikan = sum(float(r.get('ÇIKAN') or 0) for r in filtered)
+    total_bakiye = sum(float(r.get('BAKİYE') or 0) for r in filtered)
+    negative_count = sum(1 for r in filtered if float(r.get('BAKİYE') or 0) < 0)
+    res['records'] = filtered
+    res['count'] = len(filtered)
+    if 'summary' in res:
+        res['summary']['total_giren'] = total_giren
+        res['summary']['total_cikan'] = total_cikan
+        res['summary']['total_bakiye'] = total_bakiye
+        res['summary']['negative_count'] = negative_count
+        res['summary']['kasa_count'] = len(filtered)
+    return res
+
+def get_kasa_ozet_raporu(filters=None, conn_id=1, force_local=False, user=None):
     """
     Her kasanın KODU, KASA ADI, GİREN, ÇIKAN, BAKİYE ve PARA BİRİMİ özetini döner.
-    filters: {'start_date': '...', 'end_date': '...', 'search': '...'}
+    filters: {'start_date': '...', 'end_date': '...', 'search': '...', 'allowed_kasalar': [...]}
     """
+    filters = filters or {}
+    allowed_kasalar = filters.get('allowed_kasalar')
+    if allowed_kasalar is None:
+        allowed_kasalar = permissions_manager.get_user_allowed_items('kasalar', user)
+
     bridge_url, bridge_key, is_render, use_bridge = get_bridge_config()
     if not force_local and (use_bridge or is_render):
         if not bridge_url:
@@ -541,15 +623,19 @@ def get_kasa_ozet_raporu(filters=None, conn_id=1, force_local=False):
                 'summary': {'total_giren': 0, 'total_cikan': 0, 'total_bakiye': 0, 'negative_count': 0, 'kasa_count': 0, 'currency': 'DZD'}
             }
         try:
+            req_filters = dict(filters)
+            if allowed_kasalar != ['*']:
+                req_filters['allowed_kasalar'] = allowed_kasalar
+
             resp = http_requests.post(
                 f"{bridge_url}/bridge/kasa/ozet-raporu",
-                json=filters or {},
+                json=req_filters,
                 headers={'X-Bridge-Key': bridge_key, 'ngrok-skip-browser-warning': 'true', 'User-Agent': 'NexlogBridgeClient/1.0'},
                 timeout=30
             )
             if resp.status_code == 200:
                 try:
-                    return resp.json()
+                    return filter_ozet_raporu_by_permission(resp.json(), user=user, allowed_kasalar=allowed_kasalar)
                 except Exception:
                     pass
             err_msg = f"Lokal SQL Köprüsünden veri alınamadı (HTTP {resp.status_code}). Bilgisayarınızda baslat_kopru.bat açık mı? Render'daki BRIDGE_URL güncel mi?"
@@ -570,7 +656,6 @@ def get_kasa_ozet_raporu(filters=None, conn_id=1, force_local=False):
             }
 
     try:
-        filters = filters or {}
         fp = get_active_firm_period(conn_id)
         firm = fp.get('firm_nr', '225')
         period = fp.get('period_nr', '01')
@@ -599,6 +684,11 @@ def get_kasa_ozet_raporu(filters=None, conn_id=1, force_local=False):
             where_ks.append("(KS.CODE LIKE :search OR KS.NAME LIKE :search)")
             params['search'] = search_like
 
+        if allowed_kasalar != ['*']:
+            k_clause, k_params = permissions_manager.build_sql_dimension_filter('kasalar', 'KS.CODE', user={'role':'user', 'allowed_kasalar': allowed_kasalar})
+            where_ks.append(k_clause)
+            params.update(k_params)
+
         ks_where = " AND ".join(where_ks)
 
         sql_query = f"""
@@ -626,7 +716,7 @@ def get_kasa_ozet_raporu(filters=None, conn_id=1, force_local=False):
         negative_count = int((df['BAKİYE'] < 0).sum()) if not df.empty else 0
 
         records = df.to_dict(orient='records')
-        return {
+        res = {
             'success': True,
             'records': records,
             'count': len(records),
@@ -639,6 +729,7 @@ def get_kasa_ozet_raporu(filters=None, conn_id=1, force_local=False):
                 'currency': active_curr
             }
         }
+        return filter_ozet_raporu_by_permission(res, user=user, allowed_kasalar=allowed_kasalar)
     except Exception as e:
         return {
             'success': False,
@@ -648,9 +739,9 @@ def get_kasa_ozet_raporu(filters=None, conn_id=1, force_local=False):
             'summary': {'total_giren': 0, 'total_cikan': 0, 'total_bakiye': 0, 'negative_count': 0, 'kasa_count': 0, 'currency': 'DZD'}
         }
 
-def export_kasa_raporu_to_excel(filters=None, conn_id=1):
+def export_kasa_raporu_to_excel(filters=None, conn_id=1, user=None):
     """Kasa bakiye raporunu Excel (.xlsx) dosyası olarak üretir."""
-    res = get_kasa_ozet_raporu(filters, conn_id=conn_id)
+    res = get_kasa_ozet_raporu(filters, conn_id=conn_id, user=user)
     df = pd.DataFrame(res['records'])
     
     output = io.BytesIO()
@@ -659,16 +750,23 @@ def export_kasa_raporu_to_excel(filters=None, conn_id=1):
     output.seek(0)
     return output
 
-def get_kasa_ticari_grup_analizi(filters=None, conn_id=1, force_local=False):
+def get_kasa_ticari_grup_analizi(filters=None, conn_id=1, force_local=False, user=None):
     """
     Ticari İşlem Grubu bazında 12 aylık Kasa Analiz pivot tablosunu döner.
     filters: dict {
         'year': int (varsayılan 2026),
         'kasa_kodu': str (opsiyonel),
         'direction': 'all' | 'cikis' | 'giris' (varsayılan 'all'),
-        'include_empty': bool (varsayılan True)
+        'include_empty': bool (varsayılan True),
+        'allowed_kasalar': list (opsiyonel)
     }
     """
+    filters = dict(filters or {})
+    allowed_kasalar = filters.get('allowed_kasalar')
+    if allowed_kasalar is None:
+        allowed_kasalar = permissions_manager.get_user_allowed_items('kasalar', user)
+    filters['allowed_kasalar'] = allowed_kasalar
+
     bridge_url, bridge_key, is_render, use_bridge = get_bridge_config()
     if not force_local and (use_bridge or is_render):
         if not bridge_url:
@@ -686,7 +784,7 @@ def get_kasa_ticari_grup_analizi(filters=None, conn_id=1, force_local=False):
         try:
             resp = http_requests.post(
                 f"{bridge_url}/bridge/kasa/analiz-ticari-grup",
-                json=filters or {},
+                json=filters,
                 headers={'X-Bridge-Key': bridge_key, 'ngrok-skip-browser-warning': 'true', 'User-Agent': 'NexlogBridgeClient/1.0'},
                 timeout=45
             )
@@ -722,7 +820,6 @@ def get_kasa_ticari_grup_analizi(filters=None, conn_id=1, force_local=False):
 
     try:
 
-        filters = filters or {}
         fp = get_active_firm_period(conn_id)
         firm = fp.get('firm_nr', '225')
         period = fp.get('period_nr', '01')
@@ -743,6 +840,10 @@ def get_kasa_ticari_grup_analizi(filters=None, conn_id=1, force_local=False):
 
         where_clauses = ["YEAR(KSL.DATE_) = :year"]
         params = {'year': year}
+
+        kasa_perm_sql = permissions_manager.build_sql_dimension_filter('kasalar', 'KS.CODE', user=user, allowed_items=allowed_kasalar)
+        if kasa_perm_sql:
+            where_clauses.append(kasa_perm_sql)
 
         if kasa_kodu and kasa_kodu != 'ALL' and str(kasa_kodu).strip():
             where_clauses.append("KS.CODE = :kasa_kodu")
@@ -857,7 +958,7 @@ def get_kasa_ticari_grup_analizi(filters=None, conn_id=1, force_local=False):
             'year': 2026
         }
 
-def export_kasa_analizi_to_excel(filters=None, conn_id=1):
+def export_kasa_analizi_to_excel(filters=None, conn_id=1, user=None):
     """
     Ticari İşlem Grubu analizi Excel dosyasını (Kullanıcının talep ettiği kategori bloklu pivot formatında) üretir.
     """
@@ -865,7 +966,7 @@ def export_kasa_analizi_to_excel(filters=None, conn_id=1):
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from openpyxl.utils import get_column_letter
 
-    res = get_kasa_ticari_grup_analizi(filters, conn_id=conn_id)
+    res = get_kasa_ticari_grup_analizi(filters, conn_id=conn_id, user=user)
     categories = res.get('categories', [])
     monthly_totals = res.get('monthly_totals', {})
     grand_total = res.get('grand_total', 0.0)
@@ -999,11 +1100,17 @@ def export_kasa_analizi_to_excel(filters=None, conn_id=1):
     output.seek(0)
     return output
 
-def get_kasa_analiz_drilldown(filters=None, conn_id=1, force_local=False):
+def get_kasa_analiz_drilldown(filters=None, conn_id=1, force_local=False, user=None):
     """
     Kasa Analiz tablosunda tıklanan ay ve ticari işlem grubuna ait detay kasa hareket satırlarını (fişleri) getirir.
     all_groups=True ise o ayın TÜM gruplarına ait satırları getirir (aylık toplam hücresine tıklanınca).
     """
+    filters = dict(filters or {})
+    allowed_kasalar = filters.get('allowed_kasalar')
+    if allowed_kasalar is None:
+        allowed_kasalar = permissions_manager.get_user_allowed_items('kasalar', user)
+    filters['allowed_kasalar'] = allowed_kasalar
+
     bridge_url, bridge_key, is_render, use_bridge = get_bridge_config()
     if not force_local and (use_bridge or is_render):
         if not bridge_url:
@@ -1011,7 +1118,7 @@ def get_kasa_analiz_drilldown(filters=None, conn_id=1, force_local=False):
         try:
             resp = http_requests.post(
                 f"{bridge_url}/bridge/kasa/analiz-drilldown",
-                json=filters or {},
+                json=filters,
                 headers={'X-Bridge-Key': bridge_key, 'ngrok-skip-browser-warning': 'true', 'User-Agent': 'NexlogBridgeClient/1.0'},
                 timeout=30
             )
@@ -1026,9 +1133,6 @@ def get_kasa_analiz_drilldown(filters=None, conn_id=1, force_local=False):
             print(f"Bridge get_kasa_analiz_drilldown hatası: {e}")
         if is_render:
             return {'success': False, 'message': f'Lokal SQL Köprüsüne bağlanılamadı ({bridge_url or "URL yok"}). Lütfen baslat_kopru.bat dosyasının açık olduğundan emin olun.', 'lines': [], 'count': 0, 'total': 0.0}
-
-    if filters is None:
-        filters = {}
 
     fp = get_active_firm_period(conn_id)
     firm = fp.get('firm_nr', '225')
@@ -1061,6 +1165,10 @@ def get_kasa_analiz_drilldown(filters=None, conn_id=1, force_local=False):
         'local_curtype': local_curtype,
         'fnr_int': fnr_int
     }
+
+    kasa_perm_sql = permissions_manager.build_sql_dimension_filter('kasalar', 'KS.CODE', user=user, allowed_items=allowed_kasalar)
+    if kasa_perm_sql:
+        where_clauses.append(kasa_perm_sql)
 
     if direction == 'cikis':
         where_clauses.append("KSL.SIGN = 1")

@@ -6,6 +6,9 @@
     "role": "admin",
     "allowed_pages": [
       "*"
+    ],
+    "allowed_kasalar": [
+      "*"
     ]
   },
   {
@@ -21,6 +24,9 @@
       "kasa_analizi",
       "finans",
       "raporlar"
+    ],
+    "allowed_kasalar": [
+      "*"
     ]
   }
 ]
