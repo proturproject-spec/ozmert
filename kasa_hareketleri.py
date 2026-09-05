@@ -1057,6 +1057,9 @@ def get_kasa_analiz_drilldown(filters=None, conn_id=1, force_local=False):
     params = {
         'year': year,
         'month': month,
+        'local_curcode': local_curcode,
+        'local_curtype': local_curtype,
+        'fnr_int': fnr_int
     }
 
     if direction == 'cikis':
@@ -1122,10 +1125,15 @@ def get_kasa_analiz_drilldown(filters=None, conn_id=1, force_local=False):
         ) AS [INV_GENEXP_ALL],
         INV_LINES.LINEEXP_ALL AS [STL_LINEEXP_ALL],
         ISNULL(KSL.LINEEXP, '') AS [KSL_LINEEXP],
-        KSL.AMOUNT AS [Tutar]
+        KSL.AMOUNT AS [Tutar],
+        CASE 
+            WHEN KSL.TRCURR = 0 OR KSL.TRCURR = :local_curtype THEN :local_curcode
+            ELSE ISNULL(NULLIF(LTRIM(RTRIM(CUR.CURCODE)), ''), :local_curcode)
+        END AS [Para Birimi]
     FROM LG_{firm}_{period}_KSLINES KSL WITH(NOLOCK)
     LEFT JOIN LG_{firm}_KSCARD KS WITH(NOLOCK) ON KSL.CARDREF = KS.LOGICALREF
     LEFT JOIN L_TRADGRP TRG WITH(NOLOCK) ON KSL.TRADINGGRP = TRG.GCODE
+    LEFT JOIN L_CURRENCYLIST CUR WITH(NOLOCK) ON (CUR.CURTYPE = KSL.TRCURR AND CUR.FIRMNR = :fnr_int)
     LEFT JOIN LG_{firm}_{period}_CLFLINE CLF WITH(NOLOCK) ON (KSL.TRCODE IN (11, 12) AND KSL.TRANSREF = CLF.LOGICALREF)
     LEFT JOIN LG_{firm}_CLCARD CLC WITH(NOLOCK) ON CLF.CLIENTREF = CLC.LOGICALREF
     LEFT JOIN LG_{firm}_{period}_INVOICE INV WITH(NOLOCK) ON (KSL.TRCODE IN (31, 34, 35, 36, 37, 38, 39) AND KSL.TRANSREF = INV.LOGICALREF)

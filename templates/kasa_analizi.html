@@ -575,9 +575,10 @@ function fmt(amount) {
     if (!amount || isNaN(amount) || Math.abs(Number(amount)) < 0.001) return '';
     return Number(amount).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
-function fmtCurr(amount) {
+function fmtCurr(amount, curr) {
+    const c = curr || currentCurrency;
     if (amount === null || amount === undefined || isNaN(amount)) return '–';
-    return Number(amount).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + currentCurrency;
+    return Number(amount).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + c;
 }
 function escHtml(s) {
     if (!s) return '';
@@ -851,24 +852,25 @@ async function openDrillDown(kalemAdi, grupKodu, month, year) {
                     ? `<span class="expandable-cell" onclick="toggleExpand(this)" title="Tıkla: genişlet / daralt">${escHtml(acik)}</span>`
                     : `<span style="color:var(--text-muted)">–</span>`;
 
+                const rowCurr = l['Para Birimi'] || curr;
                 html += `<tr>
                     <td style="font-weight:600;font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${escHtml(kasaAdi)}">${escHtml(kasaAdi)}</td>
                     <td><span class="badge-trcode ${badgeClass}">${escHtml(islemTuru)}</span></td>
                     <td style="font-family:'Consolas',monospace;font-size:0.81rem;white-space:nowrap;">${escHtml(l['Tarih'] || '–')}</td>
                     <td style="font-family:'Consolas',monospace;color:#60a5fa;font-weight:700;white-space:nowrap;">${escHtml(fisno)}</td>
-                    <td style="text-align:right;font-family:'Consolas',monospace;font-variant-numeric:tabular-nums;font-weight:700;color:#34d399;white-space:nowrap;">₺${fmt(tutar)}</td>
+                    <td style="text-align:right;font-family:'Consolas',monospace;font-variant-numeric:tabular-nums;font-weight:700;color:#34d399;white-space:nowrap;">${fmt(tutar)} ${rowCurr}</td>
                     <td style="vertical-align:middle;">${cariHtml}</td>
                     <td style="vertical-align:middle;">${acikHtml}</td>
                 </tr>`;
             });
             dTbody.innerHTML = html;
             dCount.textContent = data.count.toLocaleString('tr-TR') + ' kayıt';
-            dTotal.textContent = 'Toplam: ' + fmtCurr(data.total);
+            dTotal.textContent = 'Toplam: ' + fmtCurr(data.total, curr);
         } else {
             const emptyMsg = data && data.message ? data.message : 'Bu dönem için detay kayıt bulunamadı.';
             dTbody.innerHTML = `<tr><td colspan="7" style="padding:2.5rem;text-align:center;color:var(--text-muted);">📭 ${escHtml(emptyMsg)}</td></tr>`;
             dCount.textContent = '0 kayıt';
-            dTotal.textContent = fmtCurr(0);
+            dTotal.textContent = fmtCurr(0, curr);
         }
     } catch(e) {
         let errMsg = e.message || 'Bağlantı hatası oluştu.';
