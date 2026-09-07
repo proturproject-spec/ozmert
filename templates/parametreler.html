@@ -392,6 +392,55 @@
         color: #f87171;
     }
 
+    /* Kasa Erişim Kartları & Butonları (Logo Kasaları) */
+    .kasa-access-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.65rem 0.85rem;
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 0.55rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        user-select: none;
+    }
+    .kasa-access-card:hover {
+        border-color: var(--accent);
+        background: var(--card-bg-subtle);
+    }
+    .kasa-access-card.active {
+        border-color: rgba(16, 185, 129, 0.45);
+        background: rgba(16, 185, 129, 0.08);
+    }
+    .kasa-access-card.passive {
+        opacity: 0.75;
+        border-color: var(--border-color);
+        background: var(--card-bg);
+    }
+    .kasa-status-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-size: 0.75rem;
+        padding: 0.2rem 0.65rem;
+        border-radius: 9999px;
+        font-weight: 700;
+        cursor: pointer;
+        border: 1px solid transparent;
+        transition: all 0.2s ease;
+    }
+    .kasa-status-btn.btn-active {
+        background: rgba(16, 185, 129, 0.2);
+        color: #34d399;
+        border-color: rgba(16, 185, 129, 0.4);
+    }
+    .kasa-status-btn.btn-passive {
+        background: rgba(239, 68, 68, 0.15);
+        color: #f87171;
+        border-color: rgba(239, 68, 68, 0.3);
+    }
+
     /* Toast Bildirim */
     #toast-container {
         position: fixed;
@@ -1204,29 +1253,30 @@
             </div>
 
             <!-- KASA ERİŞİM YETKİLERİ -->
-            <div id="add-user-kasalar-wrap" style="margin-top: 1rem; padding: 1rem; background: var(--card-bg-subtle); border: 1px solid var(--border-color); border-radius: 0.5rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-                    <label class="form-label" style="margin: 0; font-weight: 700; color: var(--accent);">🏢 Görebileceği Kasalar:</label>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <button type="button" class="btn btn-outline" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="toggleAllKasalar('add-user', true)">Tüm Kasalar</button>
-                        <button type="button" class="btn btn-outline" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="toggleAllKasalar('add-user', false)">Temizle</button>
+            <div id="add-user-kasalar-wrap" style="margin-top: 1.25rem; padding: 1rem; background: var(--card-bg-subtle); border: 1px solid var(--border-color); border-radius: 0.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                    <div>
+                        <label class="form-label" style="margin: 0; font-weight: 700; color: var(--accent); display: flex; align-items: center; gap: 0.4rem;">
+                            <span>🏢</span> Görebileceği Kasalar (Logo Kasa Kartları):
+                        </label>
+                        <span style="font-size: 0.76rem; color: var(--text-muted);">Buton aktif olan kasaları görebilir, pasif olanları göremez.</span>
+                    </div>
+                    <div style="display: flex; gap: 0.4rem;">
+                        <button type="button" class="btn btn-outline" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; color: #34d399; border-color: rgba(16, 185, 129, 0.4);" onclick="setAllKasalarActive('add-user', true)">Tümünü Aktif Et</button>
+                        <button type="button" class="btn btn-outline" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; color: #f87171; border-color: rgba(239, 68, 68, 0.4);" onclick="setAllKasalarActive('add-user', false)">Tümünü Pasif Et</button>
                     </div>
                 </div>
 
-                <div style="margin-bottom: 0.6rem;">
-                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-main); cursor: pointer; background: var(--card-bg); padding: 0.4rem 0.6rem; border-radius: 6px; border: 1px solid var(--border-color); font-weight: 700;">
-                        <input type="checkbox" id="add-user-kasa-all" value="*" checked onchange="handleKasaAllToggle('add-user')">
-                        <span>⭐ Tüm Kasaları Görebilsin (Kısıtlama Yok)</span>
-                    </label>
+                <!-- Arama Filtresi -->
+                <div style="margin-bottom: 0.75rem;">
+                    <input type="text" class="form-control" id="add-user-kasa-search" placeholder="🔍 Kasa kodu veya adı ara..." style="padding: 0.4rem 0.65rem; font-size: 0.82rem;" oninput="filterKasaListUI('add-user', this.value)">
                 </div>
 
-                <div id="add-user-kasa-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; max-height: 180px; overflow-y: auto; padding-right: 0.25rem;">
-                    {% for k in all_kasalar %}
-                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; color: var(--text-main); cursor: pointer; background: var(--card-bg); padding: 0.35rem 0.5rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                        <input type="checkbox" class="add-user-kasa-check" value="{{ k.CODE }}" checked onchange="handleSingleKasaToggle('add-user')">
-                        <span title="{{ k.NAME }}"><strong style="color: var(--accent);">{{ k.CODE }}</strong> - {{ k.NAME }}</span>
-                    </label>
-                    {% endfor %}
+                <!-- Kasa Kart Listesi -->
+                <div id="add-user-kasa-list" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 240px; overflow-y: auto; padding-right: 0.25rem;">
+                    <div style="text-align: center; padding: 1.25rem; color: var(--text-muted); font-size: 0.85rem;">
+                        🔄 Logo Kasaları yükleniyor...
+                    </div>
                 </div>
             </div>
 
@@ -1240,7 +1290,7 @@
 
 <!-- YETKİ VE SAYFA İZİNLERİNİ DÜZENLEME MODALI -->
 <div id="edit-permissions-modal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(5px); z-index: 999; align-items: center; justify-content: center; padding: 1rem; overflow-y: auto;">
-    <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 0.85rem; width: 100%; max-width: 520px; padding: 1.75rem; box-shadow: 0 20px 40px var(--shadow-color); max-height: 90vh; overflow-y: auto;">
+    <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 0.85rem; width: 100%; max-width: 540px; padding: 1.75rem; box-shadow: 0 20px 40px var(--shadow-color); max-height: 90vh; overflow-y: auto;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
             <h3 style="font-size: 1.2rem; margin: 0; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem;">
                 <span>🛡️</span> Yetkileri ve Sayfa İzinlerini Düzenle
@@ -1290,29 +1340,30 @@
             </div>
 
             <!-- KASA ERİŞİM YETKİLERİ -->
-            <div id="edit-user-kasalar-wrap" style="margin-top: 1rem; padding: 1rem; background: var(--card-bg-subtle); border: 1px solid var(--border-color); border-radius: 0.5rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-                    <label class="form-label" style="margin: 0; font-weight: 700; color: var(--accent);">🏢 Görebileceği Kasalar:</label>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <button type="button" class="btn btn-outline" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="toggleAllKasalar('edit-user', true)">Tüm Kasalar</button>
-                        <button type="button" class="btn btn-outline" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="toggleAllKasalar('edit-user', false)">Temizle</button>
+            <div id="edit-user-kasalar-wrap" style="margin-top: 1.25rem; padding: 1rem; background: var(--card-bg-subtle); border: 1px solid var(--border-color); border-radius: 0.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                    <div>
+                        <label class="form-label" style="margin: 0; font-weight: 700; color: var(--accent); display: flex; align-items: center; gap: 0.4rem;">
+                            <span>🏢</span> Görebileceği Kasalar (Logo Kasa Kartları):
+                        </label>
+                        <span style="font-size: 0.76rem; color: var(--text-muted);">Buton aktif olan kasaları görebilir, pasif olanları göremez.</span>
+                    </div>
+                    <div style="display: flex; gap: 0.4rem;">
+                        <button type="button" class="btn btn-outline" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; color: #34d399; border-color: rgba(16, 185, 129, 0.4);" onclick="setAllKasalarActive('edit-user', true)">Tümünü Aktif Et</button>
+                        <button type="button" class="btn btn-outline" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; color: #f87171; border-color: rgba(239, 68, 68, 0.4);" onclick="setAllKasalarActive('edit-user', false)">Tümünü Pasif Et</button>
                     </div>
                 </div>
 
-                <div style="margin-bottom: 0.6rem;">
-                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-main); cursor: pointer; background: var(--card-bg); padding: 0.4rem 0.6rem; border-radius: 6px; border: 1px solid var(--border-color); font-weight: 700;">
-                        <input type="checkbox" id="edit-user-kasa-all" value="*" onchange="handleKasaAllToggle('edit-user')">
-                        <span>⭐ Tüm Kasaları Görebilsin (Kısıtlama Yok)</span>
-                    </label>
+                <!-- Arama Filtresi -->
+                <div style="margin-bottom: 0.75rem;">
+                    <input type="text" class="form-control" id="edit-user-kasa-search" placeholder="🔍 Kasa kodu veya adı ara..." style="padding: 0.4rem 0.65rem; font-size: 0.82rem;" oninput="filterKasaListUI('edit-user', this.value)">
                 </div>
 
-                <div id="edit-user-kasa-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; max-height: 180px; overflow-y: auto; padding-right: 0.25rem;">
-                    {% for k in all_kasalar %}
-                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; color: var(--text-main); cursor: pointer; background: var(--card-bg); padding: 0.35rem 0.5rem; border-radius: 6px; border: 1px solid var(--border-color);">
-                        <input type="checkbox" class="edit-user-kasa-check" value="{{ k.CODE }}" id="edit-kasa-{{ k.CODE }}" onchange="handleSingleKasaToggle('edit-user')">
-                        <span title="{{ k.NAME }}"><strong style="color: var(--accent);">{{ k.CODE }}</strong> - {{ k.NAME }}</span>
-                    </label>
-                    {% endfor %}
+                <!-- Kasa Kart Listesi -->
+                <div id="edit-user-kasa-list" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 240px; overflow-y: auto; padding-right: 0.25rem;">
+                    <div style="text-align: center; padding: 1.25rem; color: var(--text-muted); font-size: 0.85rem;">
+                        🔄 Logo Kasaları yükleniyor...
+                    </div>
                 </div>
             </div>
 
@@ -1709,32 +1760,152 @@
     }
 
     // --- YÖNETİCİ KULLANICI & ŞİFRE & YETKİ YÖNETİMİ ---
+    let GLOBAL_ALL_KASALAR = {{ all_kasalar|tojson if all_kasalar else '[]' }};
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function sanitizeKasaId(code) {
+        return String(code).replace(/[^a-zA-Z0-9_-]/g, '_');
+    }
+
+    async function ensureKasalarLoaded() {
+        if (Array.isArray(GLOBAL_ALL_KASALAR) && GLOBAL_ALL_KASALAR.length > 0) {
+            return GLOBAL_ALL_KASALAR;
+        }
+        try {
+            const resp = await fetch('/api/kasa/tum-kasalar');
+            const data = await resp.json();
+            if (data && data.success && Array.isArray(data.kasalar) && data.kasalar.length > 0) {
+                GLOBAL_ALL_KASALAR = data.kasalar;
+            }
+        } catch (e) {
+            console.warn('Logo kasaları AJAX ile getirilemedi:', e);
+        }
+        return GLOBAL_ALL_KASALAR || [];
+    }
+
+    function renderKasaListUI(prefix, allowedKasalar, isRoleAdmin) {
+        const container = document.getElementById(`${prefix}-kasa-list`);
+        if (!container) return;
+
+        const kasalar = Array.isArray(GLOBAL_ALL_KASALAR) ? GLOBAL_ALL_KASALAR : [];
+        if (kasalar.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 1.5rem; color: var(--text-muted); font-size: 0.85rem; background: var(--card-bg); border-radius: 8px; border: 1px dashed var(--border-color);">
+                    ⚠️ Logo kasa kartları şu an alınamadı veya veritabanında kasa kartı yok.
+                    <div style="margin-top: 0.5rem;">
+                        <button type="button" class="btn btn-outline" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;" onclick="reloadKasalarAndRender('${prefix}', ${JSON.stringify(allowedKasalar || [])}, ${isRoleAdmin})">
+                            🔄 Tekrar Dene
+                        </button>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        const isAll = isRoleAdmin || !allowedKasalar || (Array.isArray(allowedKasalar) && allowedKasalar.includes('*'));
+
+        let html = '';
+        kasalar.forEach(k => {
+            const code = k.CODE || '';
+            const name = k.NAME || '';
+            const sId = sanitizeKasaId(code);
+            const isChecked = isAll || (Array.isArray(allowedKasalar) && allowedKasalar.includes(code));
+            const cardClass = isChecked ? 'active' : 'passive';
+            const btnClass = isChecked ? 'btn-active' : 'btn-passive';
+            const btnText = isChecked ? '✅ Görsün (Aktif)' : '❌ Görmesin (Pasif)';
+            const checkedAttr = isChecked ? 'checked' : '';
+
+            html += `
+                <div class="kasa-access-card ${cardClass}" id="${prefix}-card-${sId}" onclick="handleKasaCardClick('${prefix}', '${escapeHtml(code)}', event)">
+                    <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
+                        <span style="font-size: 1.15rem;">💰</span>
+                        <div style="min-width: 0;">
+                            <div style="font-size: 0.88rem; font-weight: 700; color: var(--text-main); font-family: monospace; letter-spacing: 0.5px;">${escapeHtml(code)}</div>
+                            <div style="font-size: 0.78rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(name || 'Kasa Kartı')}</div>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.65rem;" onclick="event.stopPropagation();">
+                        <button type="button" class="kasa-status-btn ${btnClass}" id="${prefix}-status-btn-${sId}" onclick="toggleKasaItem('${prefix}', '${escapeHtml(code)}')">
+                            ${btnText}
+                        </button>
+                        <label class="switch" style="margin: 0;" title="Kasa Görme Durumu (Aktif: Görsün, Pasif: Görmesin)">
+                            <input type="checkbox" class="${prefix}-kasa-check" value="${escapeHtml(code)}" id="${prefix}-check-${sId}" ${checkedAttr} onchange="onKasaSwitchChanged('${prefix}', '${escapeHtml(code)}', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+        const searchInput = document.getElementById(`${prefix}-kasa-search`);
+        if (searchInput && searchInput.value) {
+            filterKasaListUI(prefix, searchInput.value);
+        }
+    }
+
+    async function reloadKasalarAndRender(prefix, allowedKasalar, isRoleAdmin) {
+        GLOBAL_ALL_KASALAR = [];
+        const container = document.getElementById(`${prefix}-kasa-list`);
+        if (container) {
+            container.innerHTML = '<div style="text-align: center; padding: 1.25rem; color: var(--text-muted); font-size: 0.85rem;">🔄 Logo Kasaları getiriliyor...</div>';
+        }
+        await ensureKasalarLoaded();
+        renderKasaListUI(prefix, allowedKasalar, isRoleAdmin);
+    }
+
+    function onKasaSwitchChanged(prefix, code, isChecked) {
+        const sId = sanitizeKasaId(code);
+        const card = document.getElementById(`${prefix}-card-${sId}`);
+        const btn = document.getElementById(`${prefix}-status-btn-${sId}`);
+        if (card) {
+            card.classList.toggle('active', isChecked);
+            card.classList.toggle('passive', !isChecked);
+        }
+        if (btn) {
+            btn.className = `kasa-status-btn ${isChecked ? 'btn-active' : 'btn-passive'}`;
+            btn.innerHTML = isChecked ? '✅ Görsün (Aktif)' : '❌ Görmesin (Pasif)';
+        }
+    }
+
+    function toggleKasaItem(prefix, code) {
+        const sId = sanitizeKasaId(code);
+        const chk = document.getElementById(`${prefix}-check-${sId}`);
+        if (chk) {
+            chk.checked = !chk.checked;
+            onKasaSwitchChanged(prefix, code, chk.checked);
+        }
+    }
+
+    function handleKasaCardClick(prefix, code, event) {
+        if (event.target.closest('button') || event.target.closest('input') || event.target.closest('label')) {
+            return;
+        }
+        toggleKasaItem(prefix, code);
+    }
+
+    function setAllKasalarActive(prefix, active) {
+        document.querySelectorAll(`.${prefix}-kasa-check`).forEach(chk => {
+            chk.checked = active;
+            onKasaSwitchChanged(prefix, chk.value, active);
+        });
+    }
+
+    function filterKasaListUI(prefix, searchTerm) {
+        const term = (searchTerm || '').toLowerCase().trim();
+        const cards = document.querySelectorAll(`#${prefix}-kasa-list .kasa-access-card`);
+        cards.forEach(card => {
+            const text = card.textContent.toLowerCase();
+            card.style.display = (!term || text.includes(term)) ? 'flex' : 'none';
+        });
+    }
+
     function toggleAllCheckboxes(className, checked) {
         document.querySelectorAll(`.${className}`).forEach(cb => {
-            cb.checked = checked;
-        });
-    }
-
-    function handleKasaAllToggle(prefix) {
-        const allCheck = document.getElementById(`${prefix}-kasa-all`);
-        const checks = document.querySelectorAll(`.${prefix}-kasa-check`);
-        checks.forEach(cb => {
-            cb.checked = allCheck.checked;
-        });
-    }
-
-    function handleSingleKasaToggle(prefix) {
-        const allCheck = document.getElementById(`${prefix}-kasa-all`);
-        const checks = Array.from(document.querySelectorAll(`.${prefix}-kasa-check`));
-        const allChecked = checks.length > 0 && checks.every(cb => cb.checked);
-        if (allCheck) allCheck.checked = allChecked;
-    }
-
-    function toggleAllKasalar(prefix, checked) {
-        const allCheck = document.getElementById(`${prefix}-kasa-all`);
-        if (allCheck) allCheck.checked = checked;
-        const checks = document.querySelectorAll(`.${prefix}-kasa-check`);
-        checks.forEach(cb => {
             cb.checked = checked;
         });
     }
@@ -1744,7 +1915,7 @@
         const wrapKasalar = document.getElementById('add-user-kasalar-wrap');
         if (role === 'admin') {
             toggleAllCheckboxes('add-user-page-check', true);
-            toggleAllKasalar('add-user', true);
+            setAllKasalarActive('add-user', true);
             if (wrapPages) { wrapPages.style.opacity = '0.5'; wrapPages.style.pointerEvents = 'none'; }
             if (wrapKasalar) { wrapKasalar.style.opacity = '0.5'; wrapKasalar.style.pointerEvents = 'none'; }
         } else {
@@ -1758,7 +1929,7 @@
         const wrapKasalar = document.getElementById('edit-user-kasalar-wrap');
         if (role === 'admin') {
             toggleAllCheckboxes('edit-user-page-check', true);
-            toggleAllKasalar('edit-user', true);
+            setAllKasalarActive('edit-user', true);
             if (wrapPages) { wrapPages.style.opacity = '0.5'; wrapPages.style.pointerEvents = 'none'; }
             if (wrapKasalar) { wrapKasalar.style.opacity = '0.5'; wrapKasalar.style.pointerEvents = 'none'; }
         } else {
@@ -1767,7 +1938,7 @@
         }
     }
 
-    function toggleAddUserModal(show) {
+    async function toggleAddUserModal(show) {
         const modal = document.getElementById('add-user-modal');
         if (modal) {
             modal.style.display = show ? 'flex' : 'none';
@@ -1776,9 +1947,16 @@
                 document.getElementById('new-user-role').value = 'user';
                 toggleAddUserRolePermissions('user');
                 toggleAllCheckboxes('add-user-page-check', true);
-                toggleAllKasalar('add-user', true);
                 const paramCheck = document.querySelector('.add-user-page-check[value="parametreler"]');
                 if (paramCheck) paramCheck.checked = false;
+
+                const searchInput = document.getElementById('add-user-kasa-search');
+                if (searchInput) searchInput.value = '';
+
+                // Kasaları yükle ve render et (varsayılan: hepsi aktif)
+                await ensureKasalarLoaded();
+                renderKasaListUI('add-user', ['*'], false);
+
                 document.getElementById('new-user-username').focus();
             }
         }
@@ -1802,12 +1980,16 @@
         }
 
         const allowed_kasalar = [];
-        if (role === 'admin' || document.getElementById('add-user-kasa-all')?.checked) {
+        if (role === 'admin') {
             allowed_kasalar.push('*');
         } else {
-            document.querySelectorAll('.add-user-kasa-check:checked').forEach(cb => {
-                allowed_kasalar.push(cb.value);
-            });
+            const allChecks = Array.from(document.querySelectorAll('.add-user-kasa-check'));
+            const checkedKasalar = allChecks.filter(cb => cb.checked).map(cb => cb.value);
+            if (allChecks.length > 0 && checkedKasalar.length === allChecks.length) {
+                allowed_kasalar.push('*'); // Hepsi seçilmişse '*' sakla
+            } else {
+                allowed_kasalar.push(...checkedKasalar);
+            }
         }
 
         btn.disabled = true;
@@ -1836,7 +2018,7 @@
         }
     }
 
-    function promptEditPermissions(username, name, role, allowedPages, allowedKasalar) {
+    async function promptEditPermissions(username, name, role, allowedPages, allowedKasalar) {
         document.getElementById('edit-user-username').value = username;
         document.getElementById('edit-user-username-display').value = username;
         document.getElementById('edit-user-name').value = name || username;
@@ -1852,18 +2034,12 @@
             }
         });
 
-        // Kasa Checkboxları
-        const isAllKasalar = role === 'admin' || !allowedKasalar || (Array.isArray(allowedKasalar) && allowedKasalar.includes('*'));
-        const kasaAllCheck = document.getElementById('edit-user-kasa-all');
-        if (kasaAllCheck) kasaAllCheck.checked = isAllKasalar;
+        const searchInput = document.getElementById('edit-user-kasa-search');
+        if (searchInput) searchInput.value = '';
 
-        document.querySelectorAll('.edit-user-kasa-check').forEach(cb => {
-            if (isAllKasalar) {
-                cb.checked = true;
-            } else {
-                cb.checked = Array.isArray(allowedKasalar) && allowedKasalar.includes(cb.value);
-            }
-        });
+        // Kasaları yükle ve render et
+        await ensureKasalarLoaded();
+        renderKasaListUI('edit-user', allowedKasalar, role === 'admin');
 
         toggleEditRolePermissions(role);
         toggleEditPermissionsModal(true);
@@ -1893,12 +2069,16 @@
         }
 
         const allowed_kasalar = [];
-        if (role === 'admin' || document.getElementById('edit-user-kasa-all')?.checked) {
+        if (role === 'admin') {
             allowed_kasalar.push('*');
         } else {
-            document.querySelectorAll('.edit-user-kasa-check:checked').forEach(cb => {
-                allowed_kasalar.push(cb.value);
-            });
+            const allChecks = Array.from(document.querySelectorAll('.edit-user-kasa-check'));
+            const checkedKasalar = allChecks.filter(cb => cb.checked).map(cb => cb.value);
+            if (allChecks.length > 0 && checkedKasalar.length === allChecks.length) {
+                allowed_kasalar.push('*');
+            } else {
+                allowed_kasalar.push(...checkedKasalar);
+            }
         }
 
         btn.disabled = true;

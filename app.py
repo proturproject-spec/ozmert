@@ -524,6 +524,18 @@ def kasa_analizi_view():
                            years=[2026, 2025, 2024],
                            current_year=2026)
 
+@app.route('/api/kasa/tum-kasalar', methods=['GET'])
+@login_required
+def api_kasa_tum_kasalar():
+    """Logo'da kayıtlı tüm aktif kasa kartlarını yetki kısıtı olmaksızın döner (Yetki yönetimi için)."""
+    try:
+        cards = kasa_hareketleri.get_kasa_kartlari(conn_id=1, ignore_permission=True)
+        if not cards:
+            cards = kasa_hareketleri.get_kasa_kartlari(conn_id=1, force_local=True, ignore_permission=True)
+        return jsonify({'success': True, 'kasalar': cards})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e), 'kasalar': []}), 200
+
 @app.route('/api/kasa-analizi/data', methods=['GET', 'POST'])
 @login_required
 def api_kasa_analizi_data():
@@ -996,7 +1008,13 @@ def parametreler():
     cari_settings = cari_hesap_ekstresi.load_cari_settings()
     general_settings = load_general_settings()
     logo_currencies = get_logo_currencies(1)
-    all_kasalar = kasa_hareketleri.get_kasa_kartlari(conn_id=1, ignore_permission=True)
+    try:
+        all_kasalar = kasa_hareketleri.get_kasa_kartlari(conn_id=1, ignore_permission=True)
+        if not all_kasalar:
+            all_kasalar = kasa_hareketleri.get_kasa_kartlari(conn_id=1, force_local=True, ignore_permission=True)
+    except Exception as e:
+        print(f"all_kasalar hatası: {e}")
+        all_kasalar = []
     # Şifre hash'lerini frontend'e göndermemek için temiz liste oluştur
     users = [
         {
