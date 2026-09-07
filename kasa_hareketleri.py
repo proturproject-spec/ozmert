@@ -684,10 +684,9 @@ def get_kasa_ozet_raporu(filters=None, conn_id=1, force_local=False, user=None):
             where_ks.append("(KS.CODE LIKE :search OR KS.NAME LIKE :search)")
             params['search'] = search_like
 
-        if allowed_kasalar != ['*']:
-            k_clause, k_params = permissions_manager.build_sql_dimension_filter('kasalar', 'KS.CODE', user={'role':'user', 'allowed_kasalar': allowed_kasalar})
-            where_ks.append(k_clause)
-            params.update(k_params)
+        kasa_perm_sql = permissions_manager.build_sql_dimension_filter('kasalar', 'KS.CODE', user=user, allowed_items=allowed_kasalar)
+        if kasa_perm_sql:
+            where_ks.append(kasa_perm_sql)
 
         ks_where = " AND ".join(where_ks)
 
