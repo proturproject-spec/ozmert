@@ -235,6 +235,20 @@ def require_login():
 
     session['last_active'] = now
 
+    # Kullanıcı yetkilerini dinamik senkronize et (Yönetici yetki değiştirdiğinde çıkış yapmadan anında yansısın)
+    if 'user' in session and session['user'].get('role') != 'admin':
+        try:
+            u_name = session['user'].get('username', '').lower()
+            users = load_users()
+            for u in users:
+                if u.get('username', '').lower() == u_name:
+                    session['user']['allowed_pages'] = u.get('allowed_pages', [])
+                    session['user']['allowed_kasalar'] = u.get('allowed_kasalar', ['*'])
+                    session['user']['role'] = u.get('role', 'user')
+                    break
+        except Exception:
+            pass
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if 'user' in session:

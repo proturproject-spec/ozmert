@@ -31,7 +31,7 @@ def get_user_allowed_items(dimension, user=None):
     """
     u = user if user is not None else get_current_user()
     if not u:
-        return []
+        return ['*']
     
     if u.get('role') == 'admin':
         return ['*']

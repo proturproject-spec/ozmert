@@ -624,8 +624,7 @@ def get_kasa_ozet_raporu(filters=None, conn_id=1, force_local=False, user=None):
             }
         try:
             req_filters = dict(filters)
-            if allowed_kasalar != ['*']:
-                req_filters['allowed_kasalar'] = allowed_kasalar
+            req_filters['allowed_kasalar'] = allowed_kasalar
 
             resp = http_requests.post(
                 f"{bridge_url}/bridge/kasa/ozet-raporu",
