@@ -67,7 +67,12 @@ def filter_items_by_permission(items, dimension, code_key='CODE', user=None):
     Sözlük listesini (dict list) yetkili kodlara göre süzer.
     Örnek: filter_items_by_permission(kasalar, 'kasalar', code_key='CODE')
     """
-    allowed = get_user_allowed_items(dimension, user)
+    u = user if user is not None else get_current_user()
+    if not u:
+        # Aktif kullanıcı / oturum yoksa (örn: Bridge servisi, arka plan görevi), kısıtlama yapma
+        return items
+
+    allowed = get_user_allowed_items(dimension, user=u)
     if '*' in allowed:
         return items
     

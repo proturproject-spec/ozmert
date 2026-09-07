@@ -628,7 +628,7 @@ import kasa_hareketleri
 def bridge_kasa_kartlar():
     if not verify_key():
         return jsonify({'error': 'Yetkisiz erişim'}), 401
-    return jsonify(kasa_hareketleri.get_kasa_kartlari(conn_id=1, force_local=True))
+    return jsonify(kasa_hareketleri.get_kasa_kartlari(conn_id=1, force_local=True, ignore_permission=True))
 
 @bridge_app.route('/bridge/kasa/data-summary', methods=['GET', 'POST'])
 def bridge_kasa_data_summary():
